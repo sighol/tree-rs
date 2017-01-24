@@ -1,0 +1,9 @@
+[package]
+name = "tree-rs"
+version = "0.1.0"
+authors = ["Sigurd Holsen <sighol@gmail.com>"]
+
+[dependencies]
+walkdir = "1"
+clap = "*"
+termcolor = "*"
