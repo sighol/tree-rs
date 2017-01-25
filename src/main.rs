@@ -144,13 +144,25 @@ fn iterate_folders(path: &Path,
         return Ok(());
     }
 
+    let is_dir = path.is_dir();
+
+    // Do I have to use two if's here?
+    if is_dir {
+        if let Ok(link_path) = fs::read_link(path) {
+            let file_name = format!("{} -> {}", &file_name, link_path.display());
+            print_path(&path, &file_name, levels, t, config)?;
+            return Ok(());
+        }
+    }
+
     print_path(&path, file_name, levels, t, config)?;
+
     let level = levels.len();
     if level >= config.max_level {
         return Ok(());
     }
 
-    if path.is_dir() {
+    if is_dir {
         let dir_entries = get_sorted_dir_entries(path);
         if let Err(err) = dir_entries {
             let error_msg = format!("Could not read directory '{}': {}", path.display(), err);
@@ -234,9 +246,7 @@ fn main() {
     let path = matches.value_of("DIR").unwrap_or(".");
     let path = Path::new(path);
 
-
     let mut vec: Vec<bool> = Vec::new();
-
     let mut t = term::stdout().unwrap();
     iterate_folders(&path, &mut vec, &mut t, &config).expect("Program failed");
 }
