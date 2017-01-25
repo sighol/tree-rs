@@ -8,11 +8,14 @@ use std::path::Path;
 
 use std::cmp::Ordering;
 
+use clap::{Arg, App};
+
 enum DirSign {
     Cross,
     Vert,
     Horz,
     LastFile,
+    Blank,
 }
 
 impl DirSign {
@@ -22,6 +25,7 @@ impl DirSign {
             DirSign::Cross => '├',
             DirSign::Vert => '│',
             DirSign::LastFile => '└',
+            DirSign::Blank => '\u{00A0}',
         };
     }
 }
@@ -39,7 +43,7 @@ fn order_dir_entry(a: &DirEntry, b: &DirEntry) -> Ordering {
 
     let b_path = b.path();
     let b_name = path_to_str(&b_path);
-    
+
     a_name.cmp(b_name)
 }
 
@@ -58,19 +62,23 @@ fn get_sorted_dir_entries(path: &Path) -> Vec<DirEntry> {
     dir_entries
 }
 
-fn print_path(path: &Path, file_name: &str, levels: &mut Vec<bool>, t: &mut Box<term::StdoutTerminal>) {
+fn line_prefix(levels: &mut Vec<bool>) -> String {
     let mut spaces = String::new();
     let len = levels.len();
     let index = if len > 0 { len - 1 } else { 0 };
     for level in levels.iter().take(index) {
         if *level {
             spaces.push(DirSign::Vert.char());
+            for _ in 0..2 {
+                spaces.push(DirSign::Blank.char())
+            }
         } else {
-            spaces.push(' ')
+            for _ in 0..3 {
+                spaces.push(' ');
+            }
         }
-        for _ in 0..3 {
-            spaces.push(' ')
-        }
+
+        spaces.push(' ');
     }
 
     if let Some(last) = levels.last() {
@@ -82,15 +90,31 @@ fn print_path(path: &Path, file_name: &str, levels: &mut Vec<bool>, t: &mut Box<
 
         spaces.push(DirSign::Horz.char());
         spaces.push(DirSign::Horz.char());
-        spaces.push(' ')
+        spaces.push(' ');
     }
 
-    write!(t, "{}", spaces).unwrap();
-    if path.is_dir() {
-        t.fg(color::BRIGHT_BLUE).unwrap();
+    spaces
+}
+
+fn print_path(path: &Path,
+              file_name: &str,
+              levels: &mut Vec<bool>,
+              t: &mut Box<term::StdoutTerminal>,
+              config: &Config) {
+                  
+    let prefix = line_prefix(levels);
+
+    write!(t, "{}", prefix).unwrap();
+    if config.use_color {
+        if path.is_dir() {
+            t.fg(color::BRIGHT_BLUE).unwrap();
+        }
     }
+    
     write!(t, "{}", file_name).unwrap();
-    t.reset().unwrap();
+    if config.use_color {
+        t.reset().unwrap();
+    }
     println!("");
 }
 
@@ -98,13 +122,17 @@ fn is_hidden(file_name: &str) -> bool {
     file_name.starts_with(".") && file_name.len() > 1
 }
 
-fn iterate_folders(path: &Path, levels: &mut Vec<bool>, t: &mut Box<term::StdoutTerminal>) {
+fn iterate_folders(path: &Path,
+                   levels: &mut Vec<bool>,
+                   t: &mut Box<term::StdoutTerminal>,
+                   config: &Config) {
     let file_name = path_to_str(path);
-    print_path(&path, file_name, levels, t);
+    if is_hidden(file_name) {
+        return;
+    }
+
+    print_path(&path, file_name, levels, t, config);
     if path.is_dir() {
-        if is_hidden(file_name) {
-            return;
-        }
 
         let dir_entries = get_sorted_dir_entries(path);
 
@@ -112,26 +140,51 @@ fn iterate_folders(path: &Path, levels: &mut Vec<bool>, t: &mut Box<term::Stdout
         let len_entries = dir_entries.len();
         for entry in dir_entries.iter().take(if len_entries > 0 { len_entries - 1 } else { 0 }) {
             let path = entry.path();
-            iterate_folders(&path, levels, t);
+            iterate_folders(&path, levels, t, config);
         }
 
         levels.pop();
         levels.push(false);
         if let Some(entry) = dir_entries.last() {
             let path = entry.path();
-            iterate_folders(&path, levels, t);
+            iterate_folders(&path, levels, t, config);
         }
         levels.pop();
     }
 }
 
+struct Config {
+    use_color: bool,
+    show_hidden: bool,
+}
+
 fn main() {
+    let matches = App::new(env!("CARGO_PKG_NAME"))
+        .version(env!("CARGO_PKG_VERSION"))
+        .arg(Arg::with_name("a")
+            .short("a")
+            .long("all")
+            .help("Show hidden files"))
+        .arg(Arg::with_name("color_on")
+            .short("C")
+            .help("Turn colorization on always"))
+        .arg(Arg::with_name("color_off")
+            .short("n")
+            .help("Turn colorization off always"))
+        .get_matches();
+
+    let use_color = matches.is_present("color_on") || !matches.is_present("color_off");
+    let config = Config {
+        use_color: use_color,
+        show_hidden: matches.is_present("a"),
+    };
+
     let path = Path::new(".");
 
     let mut vec: Vec<bool> = Vec::new();
 
     let mut t = term::stdout().unwrap();
-    iterate_folders(&path, &mut vec, &mut t);
+    iterate_folders(&path, &mut vec, &mut t, &config);
 }
 
 #[cfg(test)]
