@@ -1,6 +1,12 @@
 extern crate term;
 extern crate clap;
 
+use term::color;
+
+use std::fs::{self, DirEntry};
+use std::path::Path;
+
+use std::cmp::Ordering;
 
 enum DirSign {
     Cross,
@@ -20,13 +26,6 @@ impl DirSign {
     }
 }
 
-use term::color;
-
-use std::fs::{self, DirEntry};
-use std::path::Path;
-
-use std::cmp::Ordering;
-
 fn path_to_str(dir: &Path) -> &str {
     dir.file_name()
         .and_then(|x| x.to_str())
@@ -45,9 +44,13 @@ fn order_dir_entry(a: &DirEntry, b: &DirEntry) -> Ordering {
 }
 
 fn get_sorted_dir_entries(path: &Path) -> Vec<DirEntry> {
-    let dir_entries = fs::read_dir(path)
-        .unwrap()
-        .filter_map(|e| e.ok());
+    let dir_entries = fs::read_dir(path);
+    if let Err(err) = dir_entries {
+        println!("Could not read directory '{}': {}", path.display(), err);
+        return Vec::new();
+    }
+
+    let dir_entries = dir_entries.unwrap().filter_map(|e| e.ok());
 
     let mut dir_entries: Vec<DirEntry> = dir_entries.collect();
     dir_entries.sort_by(order_dir_entry);
