@@ -99,22 +99,24 @@ fn print_path(path: &Path,
               file_name: &str,
               levels: &mut Vec<bool>,
               t: &mut Box<term::StdoutTerminal>,
-              config: &Config) {
+              config: &Config) -> io::Result<()> {
 
     let prefix = line_prefix(levels);
 
-    write!(t, "{}", prefix).unwrap_or(());
+    write!(t, "{}", prefix)?;
     if config.use_color {
         if path.is_dir() {
-            t.fg(color::BRIGHT_BLUE).unwrap_or(());
+            t.fg(color::BRIGHT_BLUE)?;
         }
     }
 
-    write!(t, "{}", file_name).unwrap_or(());
+    write!(t, "{}", file_name)?;
     if config.use_color {
-        t.reset().unwrap_or(());
+        t.reset()?;
     }
-    write!(t, "\n").unwrap_or(());
+    writeln!(t, "")?;
+
+    Ok(())
 }
 
 fn is_hidden(file_name: &str) -> bool {
@@ -124,43 +126,34 @@ fn is_hidden(file_name: &str) -> bool {
 fn iterate_folders(path: &Path,
                    levels: &mut Vec<bool>,
                    t: &mut Box<term::StdoutTerminal>,
-                   config: &Config) {
+                   config: &Config) -> io::Result<()> {
     let file_name = path_to_str(path);
     if !config.show_hidden && is_hidden(file_name) {
-        return;
+        return Ok(());
     }
 
-    print_path(&path, file_name, levels, t, config);
+    print_path(&path, file_name, levels, t, config)?;
     if path.is_dir() {
-        let dir_entries = get_sorted_dir_entries(path);
-        if let Err(err) = dir_entries {
-            if config.use_color {
-                t.fg(color::RED).unwrap_or(());
-            }
-            write!(t, "Could not read directory '{}': {}", path.display(), err).unwrap_or(());
-            if config.use_color {
-                t.reset().unwrap_or(());
-            }
-            return;
-        }
-
-        let dir_entries = dir_entries.unwrap();
+        // TODO: Add directory-path to error message.
+        let dir_entries = get_sorted_dir_entries(path)?;
 
         levels.push(true);
         let len_entries = dir_entries.len();
         for entry in dir_entries.iter().take(if len_entries > 0 { len_entries - 1 } else { 0 }) {
             let path = entry.path();
-            iterate_folders(&path, levels, t, config);
+            iterate_folders(&path, levels, t, config)?;
         }
 
         levels.pop();
         levels.push(false);
         if let Some(entry) = dir_entries.last() {
             let path = entry.path();
-            iterate_folders(&path, levels, t, config);
+            iterate_folders(&path, levels, t, config)?;
         }
         levels.pop();
     }
+
+    Ok(())
 }
 
 struct Config {
@@ -199,7 +192,10 @@ fn main() {
     let mut vec: Vec<bool> = Vec::new();
 
     let mut t = term::stdout().unwrap();
-    iterate_folders(&path, &mut vec, &mut t, &config);
+    match iterate_folders(&path, &mut vec, &mut t, &config) {
+        Ok(_) => (),
+        Err(err) => writeln!(t, "Program failed: {}", err).unwrap_or(()),
+    }
 }
 
 #[cfg(test)]
