@@ -101,7 +101,7 @@ fn print_path(path: &Path,
               levels: &mut Vec<bool>,
               t: &mut Box<term::StdoutTerminal>,
               config: &Config) {
-                  
+
     let prefix = line_prefix(levels);
 
     write!(t, "{}", prefix).unwrap();
@@ -110,7 +110,7 @@ fn print_path(path: &Path,
             t.fg(color::BRIGHT_BLUE).unwrap();
         }
     }
-    
+
     write!(t, "{}", file_name).unwrap();
     if config.use_color {
         t.reset().unwrap();
@@ -119,7 +119,7 @@ fn print_path(path: &Path,
 }
 
 fn is_hidden(file_name: &str) -> bool {
-    file_name.starts_with(".") && file_name.len() > 1
+    file_name.starts_with(".") && file_name != ".." && file_name != "."
 }
 
 fn iterate_folders(path: &Path,
@@ -171,6 +171,9 @@ fn main() {
         .arg(Arg::with_name("color_off")
             .short("n")
             .help("Turn colorization off always"))
+        .arg(Arg::with_name("DIR")
+            .index(1)
+            .help("Directory you want to search"))
         .get_matches();
 
     let use_color = matches.is_present("color_on") || !matches.is_present("color_off");
@@ -179,7 +182,11 @@ fn main() {
         show_hidden: matches.is_present("a"),
     };
 
-    let path = Path::new(".");
+
+    let path = matches.value_of("DIR").unwrap_or(".");
+    println!("Searching folder: {}", path);
+    let path = Path::new(path);
+
 
     let mut vec: Vec<bool> = Vec::new();
 
