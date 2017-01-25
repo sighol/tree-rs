@@ -95,16 +95,16 @@ fn line_prefix(levels: &mut Vec<bool>) -> String {
     prefix
 }
 
-fn writeln_color(t: &mut Box<term::StdoutTerminal>,
-                 config: &Config,
-                 color: color::Color,
-                 str: &str)
-                 -> io::Result<()> {
+fn write_color(t: &mut Box<term::StdoutTerminal>,
+               config: &Config,
+               color: color::Color,
+               str: &str)
+               -> io::Result<()> {
     if config.use_color {
         t.fg(color)?;
     }
 
-    writeln!(t, "{}", str)?;
+    write!(t, "{}", str)?;
 
     if config.use_color {
         t.reset()?;
@@ -124,7 +124,8 @@ fn print_path(path: &Path,
 
     write!(t, "{}", prefix)?;
     if path.is_dir() {
-        writeln_color(t, config, color::BRIGHT_BLUE, file_name)
+        write_color(t, config, color::BRIGHT_BLUE, file_name)?;
+        writeln!(t, "")
     } else {
         writeln!(t, "{}", file_name)
     }
@@ -149,8 +150,13 @@ fn iterate_folders(path: &Path,
     // Do I have to use two if's here?
     if is_dir {
         if let Ok(link_path) = fs::read_link(path) {
-            let file_name = format!("{} -> {}", &file_name, link_path.display());
-            print_path(&path, &file_name, levels, t, config)?;
+            let prefix = line_prefix(levels);
+            write!(t, "{}", &prefix)?;
+            write_color(t, config, color::BRIGHT_CYAN, file_name)?;
+            write!(t, " -> ")?;
+            let link_path = format!("{}\n", link_path.display());
+            write_color(t, config, color::BRIGHT_BLUE, &link_path)?;
+
             return Ok(());
         }
     }
@@ -165,8 +171,8 @@ fn iterate_folders(path: &Path,
     if is_dir {
         let dir_entries = get_sorted_dir_entries(path);
         if let Err(err) = dir_entries {
-            let error_msg = format!("Could not read directory '{}': {}", path.display(), err);
-            writeln_color(t, config, color::RED, &error_msg)?;
+            let error_msg = format!("Could not read directory '{}': {}\n", path.display(), err);
+            write_color(t, config, color::RED, &error_msg)?;
             return Ok(());
         }
 
