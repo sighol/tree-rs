@@ -153,7 +153,7 @@ fn iterate_folders(path: &Path,
     if path.is_dir() {
         let dir_entries = get_sorted_dir_entries(path);
         if let Err(err) = dir_entries {
-            let error_msg = format!("Could not read directory: {}", err);
+            let error_msg = format!("Could not read directory '{}': {}", path.display(), err);
             writeln_color(t, config, color::RED, &error_msg)?;
             return Ok(());
         }
