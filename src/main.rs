@@ -147,18 +147,19 @@ fn iterate_folders(path: &Path,
 
     let is_dir = path.is_dir();
 
-    // Do I have to use two if's here?
-    if is_dir {
-        if let Ok(link_path) = fs::read_link(path) {
-            let prefix = line_prefix(levels);
-            write!(t, "{}", &prefix)?;
-            write_color(t, config, color::BRIGHT_CYAN, file_name)?;
-            write!(t, " -> ")?;
-            let link_path = format!("{}\n", link_path.display());
+    if let Ok(link_path) = fs::read_link(path) {
+        let prefix = line_prefix(levels);
+        write!(t, "{}", &prefix)?;
+        write_color(t, config, color::BRIGHT_CYAN, file_name)?;
+        write!(t, " -> ")?;
+        let link_path = format!("{}\n", link_path.display());
+        if is_dir {
             write_color(t, config, color::BRIGHT_BLUE, &link_path)?;
-
-            return Ok(());
+        } else {
+            write!(t, "{}", link_path)?;
         }
+
+        return Ok(());
     }
 
     print_path(&path, file_name, levels, t, config)?;
