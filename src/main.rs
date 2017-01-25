@@ -95,6 +95,20 @@ fn line_prefix(levels: &mut Vec<bool>) -> String {
     prefix
 }
 
+fn writeln_color(t: &mut Box<term::StdoutTerminal>, config: &Config, color: color::Color, str: &str) -> io::Result<()> {
+    if config.use_color {
+        t.fg(color)?;
+    }
+
+    writeln!(t, "{}", str)?;
+
+    if config.use_color {
+        t.reset()?;
+    }
+
+    Ok(())
+}
+
 fn print_path(path: &Path,
               file_name: &str,
               levels: &mut Vec<bool>,
@@ -104,19 +118,11 @@ fn print_path(path: &Path,
     let prefix = line_prefix(levels);
 
     write!(t, "{}", prefix)?;
-    if config.use_color {
-        if path.is_dir() {
-            t.fg(color::BRIGHT_BLUE)?;
-        }
+    if path.is_dir() {
+        writeln_color(t, config, color::BRIGHT_BLUE, file_name)
+    } else {
+        writeln!(t, "{}", file_name)
     }
-
-    write!(t, "{}", file_name)?;
-    if config.use_color {
-        t.reset()?;
-    }
-    writeln!(t, "")?;
-
-    Ok(())
 }
 
 fn is_hidden(file_name: &str) -> bool {
@@ -136,7 +142,8 @@ fn iterate_folders(path: &Path,
     if path.is_dir() {
         let dir_entries = get_sorted_dir_entries(path);
         if let Err(err) = dir_entries {
-            writeln!(t, "Could not read directory: {}", err)?;
+            let error_msg = format!("Could not read directory: {}", err);
+            writeln_color(t, config, color::RED, &error_msg)?;
             return Ok(());
         }
 
