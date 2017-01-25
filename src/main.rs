@@ -5,6 +5,7 @@ use term::color;
 
 use std::fs::{self, DirEntry};
 use std::path::Path;
+use std::io;
 
 use std::cmp::Ordering;
 
@@ -47,53 +48,51 @@ fn order_dir_entry(a: &DirEntry, b: &DirEntry) -> Ordering {
     a_name.cmp(b_name)
 }
 
-fn get_sorted_dir_entries(path: &Path) -> Vec<DirEntry> {
+fn get_sorted_dir_entries(path: &Path) -> io::Result<Vec<DirEntry>> {
     let dir_entries = fs::read_dir(path);
-    if let Err(err) = dir_entries {
-        println!("Could not read directory '{}': {}", path.display(), err);
-        return Vec::new();
+    match dir_entries {
+        Ok(entries) => {
+            let dir_entries = entries.filter_map(|e| e.ok());
+            let mut dir_entries: Vec<DirEntry> = dir_entries.collect();
+            dir_entries.sort_by(order_dir_entry);
+            Ok(dir_entries)
+        }
+        Err(err) => Err(err),
     }
-
-    let dir_entries = dir_entries.unwrap().filter_map(|e| e.ok());
-
-    let mut dir_entries: Vec<DirEntry> = dir_entries.collect();
-    dir_entries.sort_by(order_dir_entry);
-
-    dir_entries
 }
 
 fn line_prefix(levels: &mut Vec<bool>) -> String {
-    let mut spaces = String::new();
+    let mut prefix = String::new();
     let len = levels.len();
     let index = if len > 0 { len - 1 } else { 0 };
     for level in levels.iter().take(index) {
         if *level {
-            spaces.push(DirSign::Vert.char());
+            prefix.push(DirSign::Vert.char());
             for _ in 0..2 {
-                spaces.push(DirSign::Blank.char())
+                prefix.push(DirSign::Blank.char())
             }
         } else {
             for _ in 0..3 {
-                spaces.push(' ');
+                prefix.push(' ');
             }
         }
 
-        spaces.push(' ');
+        prefix.push(' ');
     }
 
     if let Some(last) = levels.last() {
         if *last {
-            spaces.push(DirSign::Cross.char());
+            prefix.push(DirSign::Cross.char());
         } else {
-            spaces.push(DirSign::LastFile.char());
+            prefix.push(DirSign::LastFile.char());
         }
 
-        spaces.push(DirSign::Horz.char());
-        spaces.push(DirSign::Horz.char());
-        spaces.push(' ');
+        prefix.push(DirSign::Horz.char());
+        prefix.push(DirSign::Horz.char());
+        prefix.push(' ');
     }
 
-    spaces
+    prefix
 }
 
 fn print_path(path: &Path,
@@ -104,18 +103,18 @@ fn print_path(path: &Path,
 
     let prefix = line_prefix(levels);
 
-    write!(t, "{}", prefix).unwrap();
+    write!(t, "{}", prefix).unwrap_or(());
     if config.use_color {
         if path.is_dir() {
-            t.fg(color::BRIGHT_BLUE).unwrap();
+            t.fg(color::BRIGHT_BLUE).unwrap_or(());
         }
     }
 
-    write!(t, "{}", file_name).unwrap();
+    write!(t, "{}", file_name).unwrap_or(());
     if config.use_color {
-        t.reset().unwrap();
+        t.reset().unwrap_or(());
     }
-    println!("");
+    write!(t, "\n").unwrap_or(());
 }
 
 fn is_hidden(file_name: &str) -> bool {
@@ -127,14 +126,25 @@ fn iterate_folders(path: &Path,
                    t: &mut Box<term::StdoutTerminal>,
                    config: &Config) {
     let file_name = path_to_str(path);
-    if is_hidden(file_name) {
+    if !config.show_hidden && is_hidden(file_name) {
         return;
     }
 
     print_path(&path, file_name, levels, t, config);
     if path.is_dir() {
-
         let dir_entries = get_sorted_dir_entries(path);
+        if let Err(err) = dir_entries {
+            if config.use_color {
+                t.fg(color::RED).unwrap_or(());
+            }
+            write!(t, "Could not read directory '{}': {}", path.display(), err).unwrap_or(());
+            if config.use_color {
+                t.reset().unwrap_or(());
+            }
+            return;
+        }
+
+        let dir_entries = dir_entries.unwrap();
 
         levels.push(true);
         let len_entries = dir_entries.len();
@@ -182,9 +192,7 @@ fn main() {
         show_hidden: matches.is_present("a"),
     };
 
-
     let path = matches.value_of("DIR").unwrap_or(".");
-    println!("Searching folder: {}", path);
     let path = Path::new(path);
 
 
