@@ -11,24 +11,12 @@ use std::cmp::Ordering;
 
 use clap::{Arg, App};
 
-enum DirSign {
-    Cross,
-    Vert,
-    Horz,
-    LastFile,
-    Blank,
-}
-
-impl DirSign {
-    fn char(self) -> char {
-        return match self {
-            DirSign::Horz => '─',
-            DirSign::Cross => '├',
-            DirSign::Vert => '│',
-            DirSign::LastFile => '└',
-            DirSign::Blank => '\u{00A0}',
-        };
-    }
+mod dirsign {
+    pub const HORZ: char = '─';
+    pub const CROSS: char = '├';
+    pub const VERT: char = '│';
+    pub const LAST_FILE: char = '└';
+    pub const BLANK: char = '\u{00A0}';
 }
 
 fn path_to_str(dir: &Path) -> &str {
@@ -67,9 +55,9 @@ fn line_prefix(levels: &mut Vec<bool>) -> String {
     let index = if len > 0 { len - 1 } else { 0 };
     for level in levels.iter().take(index) {
         if *level {
-            prefix.push(DirSign::Vert.char());
+            prefix.push(dirsign::VERT);
             for _ in 0..2 {
-                prefix.push(DirSign::Blank.char())
+                prefix.push(dirsign::BLANK)
             }
         } else {
             for _ in 0..3 {
@@ -82,13 +70,13 @@ fn line_prefix(levels: &mut Vec<bool>) -> String {
 
     if let Some(last) = levels.last() {
         if *last {
-            prefix.push(DirSign::Cross.char());
+            prefix.push(dirsign::CROSS);
         } else {
-            prefix.push(DirSign::LastFile.char());
+            prefix.push(dirsign::LAST_FILE);
         }
 
-        prefix.push(DirSign::Horz.char());
-        prefix.push(DirSign::Horz.char());
+        prefix.push(dirsign::HORZ);
+        prefix.push(dirsign::HORZ);
         prefix.push(' ');
     }
 
