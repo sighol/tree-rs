@@ -134,8 +134,13 @@ fn iterate_folders(path: &Path,
 
     print_path(&path, file_name, levels, t, config)?;
     if path.is_dir() {
-        // TODO: Add directory-path to error message.
-        let dir_entries = get_sorted_dir_entries(path)?;
+        let dir_entries = get_sorted_dir_entries(path);
+        if let Err(err) = dir_entries {
+            writeln!(t, "Could not read directory: {}", err)?;
+            return Ok(());
+        }
+
+        let dir_entries = dir_entries.unwrap();
 
         levels.push(true);
         let len_entries = dir_entries.len();
