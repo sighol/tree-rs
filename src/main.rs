@@ -222,7 +222,7 @@ fn main() {
     let max_level = if let Some(level) = matches.value_of("level") {
         level.parse::<usize>().expect("Should have validated that this value was int...")
     } else {
-        1000
+        usize::max_value()
     };
 
     let config = Config {
