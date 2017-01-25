@@ -95,7 +95,11 @@ fn line_prefix(levels: &mut Vec<bool>) -> String {
     prefix
 }
 
-fn writeln_color(t: &mut Box<term::StdoutTerminal>, config: &Config, color: color::Color, str: &str) -> io::Result<()> {
+fn writeln_color(t: &mut Box<term::StdoutTerminal>,
+                 config: &Config,
+                 color: color::Color,
+                 str: &str)
+                 -> io::Result<()> {
     if config.use_color {
         t.fg(color)?;
     }
@@ -113,7 +117,8 @@ fn print_path(path: &Path,
               file_name: &str,
               levels: &mut Vec<bool>,
               t: &mut Box<term::StdoutTerminal>,
-              config: &Config) -> io::Result<()> {
+              config: &Config)
+              -> io::Result<()> {
 
     let prefix = line_prefix(levels);
 
@@ -132,13 +137,19 @@ fn is_hidden(file_name: &str) -> bool {
 fn iterate_folders(path: &Path,
                    levels: &mut Vec<bool>,
                    t: &mut Box<term::StdoutTerminal>,
-                   config: &Config) -> io::Result<()> {
+                   config: &Config)
+                   -> io::Result<()> {
     let file_name = path_to_str(path);
     if !config.show_hidden && is_hidden(file_name) {
         return Ok(());
     }
 
     print_path(&path, file_name, levels, t, config)?;
+    let level = levels.len();
+    if level >= config.max_level {
+        return Ok(());
+    }
+
     if path.is_dir() {
         let dir_entries = get_sorted_dir_entries(path);
         if let Err(err) = dir_entries {
@@ -171,6 +182,14 @@ fn iterate_folders(path: &Path,
 struct Config {
     use_color: bool,
     show_hidden: bool,
+    max_level: usize,
+}
+
+fn int_validator(v: String) -> Result<(), String> {
+    match v.parse::<usize>() {
+        Ok(_) => Ok(()),
+        Err(err) => Err(format!("Could not parse '{}' as an integer: {}", &v, err)),
+    }
 }
 
 fn main() {
@@ -189,12 +208,27 @@ fn main() {
         .arg(Arg::with_name("DIR")
             .index(1)
             .help("Directory you want to search"))
+        .arg(Arg::with_name("level")
+            .short("L")
+            .long("level")
+            .takes_value(true)
+            .validator(int_validator)
+            .help("Descend only level directories deep"))
         .get_matches();
 
     let use_color = matches.is_present("color_on") || !matches.is_present("color_off");
+
+
+    let max_level = if let Some(level) = matches.value_of("level") {
+        level.parse::<usize>().expect("Should have validated that this value was int...")
+    } else {
+        1000
+    };
+
     let config = Config {
         use_color: use_color,
         show_hidden: matches.is_present("a"),
+        max_level: max_level,
     };
 
     let path = matches.value_of("DIR").unwrap_or(".");
@@ -204,10 +238,7 @@ fn main() {
     let mut vec: Vec<bool> = Vec::new();
 
     let mut t = term::stdout().unwrap();
-    match iterate_folders(&path, &mut vec, &mut t, &config) {
-        Ok(_) => (),
-        Err(err) => writeln!(t, "Program failed: {}", err).unwrap_or(()),
-    }
+    iterate_folders(&path, &mut vec, &mut t, &config).expect("Program failed");
 }
 
 #[cfg(test)]
