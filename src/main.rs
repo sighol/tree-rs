@@ -2,14 +2,13 @@ extern crate term;
 extern crate clap;
 
 
-#[allow(dead_code)]
 enum DirSign {
     Cross,
     Vert,
     Horz,
     LastFile,
 }
-#[allow(dead_code)]
+
 impl DirSign {
     fn char(self) -> char {
         return match self {
@@ -31,6 +30,7 @@ use std::cmp::Ordering;
 fn path_to_str(dir: &Path) -> &str {
     dir.file_name()
         .and_then(|x| x.to_str())
+        .or_else(|| dir.to_str())
         .unwrap_or("")
 }
 
@@ -40,15 +40,8 @@ fn order_dir_entry(a: &DirEntry, b: &DirEntry) -> Ordering {
 
     let b_path = b.path();
     let b_name = path_to_str(&b_path);
-    let a_dir = a.path().is_dir();
-    let b_dir = b.path().is_dir();
-    if a_dir == b_dir {
-        a_name.cmp(b_name)
-    } else if a_dir {
-        Ordering::Greater
-    } else {
-        Ordering::Less
-    }
+    
+    a_name.cmp(b_name)
 }
 
 fn get_sorted_dir_entries(path: &Path) -> Vec<DirEntry> {
@@ -62,7 +55,7 @@ fn get_sorted_dir_entries(path: &Path) -> Vec<DirEntry> {
     dir_entries
 }
 
-fn print_path(path: &Path, file_name: &str, levels: &mut Vec<bool>) {
+fn print_path(path: &Path, file_name: &str, levels: &mut Vec<bool>, t: &mut Box<term::StdoutTerminal>) {
     let mut spaces = String::new();
     let len = levels.len();
     let index = if len > 0 { len - 1 } else { 0 };
@@ -89,17 +82,24 @@ fn print_path(path: &Path, file_name: &str, levels: &mut Vec<bool>) {
         spaces.push(' ')
     }
 
-    println!("{}{}", spaces, file_name);
+    write!(t, "{}", spaces).unwrap();
+    if path.is_dir() {
+        t.fg(color::BRIGHT_BLUE).unwrap();
+    }
+    write!(t, "{}", file_name).unwrap();
+    t.reset().unwrap();
+    println!("");
 }
 
-fn iterate_folders(path: &Path, levels: &mut Vec<bool>) {
-    let file_name: &str = path.file_name()
-        .and_then(|s| s.to_str())
-        .unwrap_or(".");
+fn is_hidden(file_name: &str) -> bool {
+    file_name.starts_with(".") && file_name.len() > 1
+}
 
-    print_path(&path, file_name, levels);
+fn iterate_folders(path: &Path, levels: &mut Vec<bool>, t: &mut Box<term::StdoutTerminal>) {
+    let file_name = path_to_str(path);
+    print_path(&path, file_name, levels, t);
     if path.is_dir() {
-        if file_name.starts_with(".") && file_name.len() > 1 {
+        if is_hidden(file_name) {
             return;
         }
 
@@ -109,14 +109,14 @@ fn iterate_folders(path: &Path, levels: &mut Vec<bool>) {
         let len_entries = dir_entries.len();
         for entry in dir_entries.iter().take(if len_entries > 0 { len_entries - 1 } else { 0 }) {
             let path = entry.path();
-            iterate_folders(&path, levels);
+            iterate_folders(&path, levels, t);
         }
 
         levels.pop();
         levels.push(false);
         if let Some(entry) = dir_entries.last() {
             let path = entry.path();
-            iterate_folders(&path, levels);
+            iterate_folders(&path, levels, t);
         }
         levels.pop();
     }
@@ -126,35 +126,10 @@ fn main() {
     let path = Path::new(".");
 
     let mut vec: Vec<bool> = Vec::new();
-    iterate_folders(&path, &mut vec);
 
     let mut t = term::stdout().unwrap();
-
-    t.fg(color::BLUE).unwrap();
-    write!(t, "hello, ").unwrap();
-
-    t.fg(color::BRIGHT_BLUE).unwrap();
-    write!(t, "world").unwrap();
-    t.reset().unwrap();
-    write!(t, " And reset").unwrap();
+    iterate_folders(&path, &mut vec, &mut t);
 }
-
-#[allow(dead_code)]
-fn get_name(entry: &DirEntry) -> Option<String> {
-    let path = entry.path();
-    let file_name = path.file_name();
-
-    match file_name {
-        None => None,
-        Some(file_name) => {
-            match file_name.to_str() {
-                None => None,
-                Some(str) => Some(String::from(str)),
-            }
-        }
-    }
-}
-
 
 #[cfg(test)]
 mod tests {
