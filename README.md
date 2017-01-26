@@ -1,3 +1,5 @@
+[![Crates.io](https://img.shields.io/crates/v/tree-rs.svg)](https://crates.io/crates/tree-rs)
+
 # Tree-rs
 
 Tree-rs tries to create a cross-platform alternative to the unix `tree` command.
