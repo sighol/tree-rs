@@ -4,5 +4,5 @@ version = "0.1.0"
 authors = ["Sigurd Holsen <sighol@gmail.com>"]
 
 [dependencies]
-clap = "*"
-term = "*"
+clap = "~2.20"
+term = "0.4.*"
