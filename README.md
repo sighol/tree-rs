@@ -1,8 +1,20 @@
 # Tree-rs
 
 Tree-rs tries to create a cross-platform alternative to the unix `tree` command.
+The goal is to be compatible with its command line arguments.
 
-It is currently only tested on linux, but it I hope it works on windows.
+`tree-rs` has been tested on Linux and Windows 7.
+
+## Example output
+
+    .
+    ├── Cargo.lock
+    ├── Cargo.toml
+    ├── README.md
+    ├── src
+    │   └── main.rs
+    └── test
+        └── file
 
 ## Installation
 
@@ -13,4 +25,8 @@ cargo install
 
 ## Performance
 
-From the small tests that I've run, it is about half the speed of `tree`.
+The performance is not as good as the windows `tree` or linux `tree` commands,
+but it prints way faster than I can read.
+
+From small benchmarks, it looks like it is about 2-10 times slower than linux
+`tree`.

@@ -2,6 +2,18 @@
 name = "tree-rs"
 version = "0.1.0"
 authors = ["Sigurd Holsen <sighol@gmail.com>"]
+description = """
+tree-rs is a cross platform incomplete reimplementation of the linux *tree*
+command. It supports colored output and specifying number of directory levels it
+should search.
+"""
+license = "Unlicense/MIT"
+readme = "README.md"
+categories = ["command-line-utilities"]
+repository = "https://github.com/sighol/tree-rs"
+homepage = "https://github.com/sighol/tree-rs"
+documentation = "https://github.com/sighol/tree-rs"
+
 
 [dependencies]
 clap = "~2.20"
