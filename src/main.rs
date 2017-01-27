@@ -32,11 +32,9 @@ fn order_dir_entry(a: &DirEntry, b: &DirEntry) -> Ordering {
 }
 
 fn get_sorted_dir_entries(path: &Path) -> io::Result<Vec<DirEntry>> {
-    let dir_entries = fs::read_dir(path);
-    match dir_entries {
+    match fs::read_dir(path) {
         Ok(entries) => {
-            let dir_entries = entries.filter_map(|e| e.ok());
-            let mut dir_entries: Vec<DirEntry> = dir_entries.collect();
+            let mut dir_entries : Vec<DirEntry> = entries.filter_map(Result::ok).collect();
             dir_entries.sort_by(order_dir_entry);
             Ok(dir_entries)
         }
