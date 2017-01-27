@@ -42,7 +42,7 @@ fn get_sorted_dir_entries(path: &Path) -> io::Result<Vec<DirEntry>> {
 
 fn line_prefix(levels: &mut Vec<bool>) -> String {
     let len        = levels.len();
-    let index      = if len > 0 { len - 1 } else { 0 };
+    let index      = len.saturating_sub(1);
     // factor = 4, because in each iteration pushes at least 3 chars in if/else plus one in the
     // for{} block, plus 4 in the last if{} in this function
     let mut prefix = String::with_capacity((len * 4) + 4);
@@ -125,8 +125,7 @@ fn iterate_folders(path: &Path,
     let is_dir = path.is_dir();
 
     if let Ok(link_path) = fs::read_link(path) {
-        let prefix = line_prefix(levels);
-        write!(t, "{}", &prefix)?;
+        write!(t, "{}", &line_prefix(levels))?;
         write_color(t, config, color::BRIGHT_CYAN, file_name)?;
         write!(t, " -> ")?;
         let link_path = format!("{}\n", link_path.display());
@@ -157,7 +156,7 @@ fn iterate_folders(path: &Path,
 
         levels.push(true);
         let len_entries = dir_entries.len();
-        for entry in dir_entries.iter().take(if len_entries > 0 { len_entries - 1 } else { 0 }) {
+        for entry in dir_entries.iter().take(len_entries.saturating_sub(1)) {
             iterate_folders(&entry.path(), levels, t, config)?;
         }
 
