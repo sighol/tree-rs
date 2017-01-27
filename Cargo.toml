@@ -1,6 +1,6 @@
 [package]
 name = "tree-rs"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Sigurd Holsen <sighol@gmail.com>"]
 description = """
 tree-rs is a cross platform incomplete reimplementation of the linux *tree*

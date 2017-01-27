@@ -112,13 +112,17 @@ fn print_path(path: &Path,
     }
 }
 
+fn is_hidden(file_name: &str) -> bool {
+    file_name != "." && file_name.starts_with(".")
+}
+
 fn iterate_folders(path: &Path,
                    levels: &mut Vec<bool>,
                    t: &mut Box<term::StdoutTerminal>,
                    config: &Config)
                    -> io::Result<()> {
     let file_name = path_to_str(path);
-    if !config.show_hidden && file_name.starts_with(".") {
+    if !config.show_hidden && is_hidden(file_name) {
         return Ok(());
     }
 
