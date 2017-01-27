@@ -32,14 +32,12 @@ fn order_dir_entry(a: &DirEntry, b: &DirEntry) -> Ordering {
 }
 
 fn get_sorted_dir_entries(path: &Path) -> io::Result<Vec<DirEntry>> {
-    match fs::read_dir(path) {
-        Ok(entries) => {
+    fs::read_dir(path)
+        .map(|entries| {
             let mut dir_entries : Vec<DirEntry> = entries.filter_map(Result::ok).collect();
             dir_entries.sort_by(order_dir_entry);
-            Ok(dir_entries)
-        }
-        Err(err) => Err(err),
-    }
+            dir_entries
+        })
 }
 
 fn line_prefix(levels: &mut Vec<bool>) -> String {
