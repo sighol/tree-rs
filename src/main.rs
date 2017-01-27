@@ -41,9 +41,11 @@ fn get_sorted_dir_entries(path: &Path) -> io::Result<Vec<DirEntry>> {
 }
 
 fn line_prefix(levels: &mut Vec<bool>) -> String {
-    let mut prefix = String::new();
-    let len = levels.len();
-    let index = if len > 0 { len - 1 } else { 0 };
+    let len        = levels.len();
+    let index      = if len > 0 { len - 1 } else { 0 };
+    // factor = 4, because in each iteration pushes at least 3 chars in if/else plus one in the
+    // for{} block, plus 4 in the last if{} in this function
+    let mut prefix = String::with_capacity((len * 4) + 4);
     for level in levels.iter().take(index) {
         if *level {
             prefix.push(dirsign::VERT);
