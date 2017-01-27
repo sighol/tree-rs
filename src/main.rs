@@ -27,13 +27,8 @@ fn path_to_str(dir: &Path) -> &str {
 }
 
 fn order_dir_entry(a: &DirEntry, b: &DirEntry) -> Ordering {
-    let a_path = a.path();
-    let a_name = path_to_str(&a_path);
-
-    let b_path = b.path();
-    let b_name = path_to_str(&b_path);
-
-    a_name.cmp(b_name)
+    let (a_path, b_path) = (a.path(), b.path());
+    path_to_str(&a_path).cmp(path_to_str(&b_path))
 }
 
 fn get_sorted_dir_entries(path: &Path) -> io::Result<Vec<DirEntry>> {
