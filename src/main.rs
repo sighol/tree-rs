@@ -192,11 +192,11 @@ struct Config {
     max_level: usize,
 }
 
-fn int_validator(v: String) -> Result<(), String> {
-    match v.parse::<usize>() {
-        Ok(_) => Ok(()),
-        Err(err) => Err(format!("Could not parse '{}' as an integer: {}", &v, err)),
-    }
+fn int_validator(v: &str) -> Result<usize, String> {
+    use std::str::FromStr;
+
+    FromStr::from_str(v)
+        .map_err(|e| format!("Could not parse '{}' as an integer: {}", &v, e))
 }
 
 fn main() {
@@ -219,7 +219,7 @@ fn main() {
             .short("L")
             .long("level")
             .takes_value(true)
-            .validator(int_validator)
+            .validator(|s| int_validator(&s).map(|_| ()))
             .help("Descend only level directories deep"))
         .get_matches();
 
