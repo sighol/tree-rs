@@ -192,7 +192,7 @@ struct Config {
     max_level: usize,
 }
 
-fn int_validator(v: &str) -> Result<usize, String> {
+fn to_int(v: &str) -> Result<usize, String> {
     use std::str::FromStr;
 
     FromStr::from_str(v)
@@ -219,7 +219,7 @@ fn main() {
             .short("L")
             .long("level")
             .takes_value(true)
-            .validator(|s| int_validator(&s).map(|_| ()))
+            .validator(|s| to_int(&s).map(|_| ()))
             .help("Descend only level directories deep"))
         .get_matches();
 
@@ -227,7 +227,7 @@ fn main() {
 
 
     let max_level = if let Some(level) = matches.value_of("level") {
-        int_validator(&level).expect("Should have validated that this value was int...")
+        to_int(&level).expect("Should have validated that this value was int...")
     } else {
         usize::max_value()
     };
