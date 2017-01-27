@@ -27,32 +27,25 @@ fn path_to_str(dir: &Path) -> &str {
 }
 
 fn order_dir_entry(a: &DirEntry, b: &DirEntry) -> Ordering {
-    let a_path = a.path();
-    let a_name = path_to_str(&a_path);
-
-    let b_path = b.path();
-    let b_name = path_to_str(&b_path);
-
-    a_name.cmp(b_name)
+    let (a_path, b_path) = (a.path(), b.path());
+    path_to_str(&a_path).cmp(path_to_str(&b_path))
 }
 
 fn get_sorted_dir_entries(path: &Path) -> io::Result<Vec<DirEntry>> {
-    let dir_entries = fs::read_dir(path);
-    match dir_entries {
-        Ok(entries) => {
-            let dir_entries = entries.filter_map(|e| e.ok());
-            let mut dir_entries: Vec<DirEntry> = dir_entries.collect();
+    fs::read_dir(path)
+        .map(|entries| {
+            let mut dir_entries : Vec<DirEntry> = entries.filter_map(Result::ok).collect();
             dir_entries.sort_by(order_dir_entry);
-            Ok(dir_entries)
-        }
-        Err(err) => Err(err),
-    }
+            dir_entries
+        })
 }
 
 fn line_prefix(levels: &mut Vec<bool>) -> String {
-    let mut prefix = String::new();
-    let len = levels.len();
-    let index = if len > 0 { len - 1 } else { 0 };
+    let len        = levels.len();
+    let index      = len.saturating_sub(1);
+    // factor = 4, because in each iteration pushes at least 3 chars in if/else plus one in the
+    // for{} block, plus 4 in the last if{} in this function
+    let mut prefix = String::with_capacity((len * 4) + 4);
     for level in levels.iter().take(index) {
         if *level {
             prefix.push(dirsign::VERT);
@@ -119,25 +112,20 @@ fn print_path(path: &Path,
     }
 }
 
-fn is_hidden(file_name: &str) -> bool {
-    file_name.starts_with(".") && file_name != ".." && file_name != "."
-}
-
 fn iterate_folders(path: &Path,
                    levels: &mut Vec<bool>,
                    t: &mut Box<term::StdoutTerminal>,
                    config: &Config)
                    -> io::Result<()> {
     let file_name = path_to_str(path);
-    if !config.show_hidden && is_hidden(file_name) {
+    if !config.show_hidden && file_name.starts_with(".") {
         return Ok(());
     }
 
     let is_dir = path.is_dir();
 
     if let Ok(link_path) = fs::read_link(path) {
-        let prefix = line_prefix(levels);
-        write!(t, "{}", &prefix)?;
+        write!(t, "{}", &line_prefix(levels))?;
         write_color(t, config, color::BRIGHT_CYAN, file_name)?;
         write!(t, " -> ")?;
         let link_path = format!("{}\n", link_path.display());
@@ -152,8 +140,7 @@ fn iterate_folders(path: &Path,
 
     print_path(&path, file_name, levels, t, config)?;
 
-    let level = levels.len();
-    if level >= config.max_level {
+    if levels.len() >= config.max_level {
         return Ok(());
     }
 
@@ -169,16 +156,14 @@ fn iterate_folders(path: &Path,
 
         levels.push(true);
         let len_entries = dir_entries.len();
-        for entry in dir_entries.iter().take(if len_entries > 0 { len_entries - 1 } else { 0 }) {
-            let path = entry.path();
-            iterate_folders(&path, levels, t, config)?;
+        for entry in dir_entries.iter().take(len_entries.saturating_sub(1)) {
+            iterate_folders(&entry.path(), levels, t, config)?;
         }
 
         levels.pop();
         levels.push(false);
         if let Some(entry) = dir_entries.last() {
-            let path = entry.path();
-            iterate_folders(&path, levels, t, config)?;
+            iterate_folders(&entry.path(), levels, t, config)?;
         }
         levels.pop();
     }
@@ -192,11 +177,11 @@ struct Config {
     max_level: usize,
 }
 
-fn int_validator(v: String) -> Result<(), String> {
-    match v.parse::<usize>() {
-        Ok(_) => Ok(()),
-        Err(err) => Err(format!("Could not parse '{}' as an integer: {}", &v, err)),
-    }
+fn to_int(v: &str) -> Result<usize, String> {
+    use std::str::FromStr;
+
+    FromStr::from_str(v)
+        .map_err(|e| format!("Could not parse '{}' as an integer: {}", &v, e))
 }
 
 fn main() {
@@ -219,7 +204,7 @@ fn main() {
             .short("L")
             .long("level")
             .takes_value(true)
-            .validator(int_validator)
+            .validator(|s| to_int(&s).map(|_| ()))
             .help("Descend only level directories deep"))
         .get_matches();
 
@@ -227,7 +212,7 @@ fn main() {
 
 
     let max_level = if let Some(level) = matches.value_of("level") {
-        level.parse::<usize>().expect("Should have validated that this value was int...")
+        to_int(&level).expect("Should have validated that this value was int...")
     } else {
         usize::max_value()
     };
@@ -238,8 +223,7 @@ fn main() {
         max_level: max_level,
     };
 
-    let path = matches.value_of("DIR").unwrap_or(".");
-    let path = Path::new(path);
+    let path = Path::new(matches.value_of("DIR").unwrap_or("."));
 
     let mut vec: Vec<bool> = Vec::new();
     let mut t = term::stdout().unwrap();
