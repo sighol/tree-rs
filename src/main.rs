@@ -141,8 +141,7 @@ fn iterate_folders(path: &Path,
 
     print_path(&path, file_name, levels, t, config)?;
 
-    let level = levels.len();
-    if level >= config.max_level {
+    if levels.len() >= config.max_level {
         return Ok(());
     }
 
@@ -159,15 +158,13 @@ fn iterate_folders(path: &Path,
         levels.push(true);
         let len_entries = dir_entries.len();
         for entry in dir_entries.iter().take(if len_entries > 0 { len_entries - 1 } else { 0 }) {
-            let path = entry.path();
-            iterate_folders(&path, levels, t, config)?;
+            iterate_folders(&entry.path(), levels, t, config)?;
         }
 
         levels.pop();
         levels.push(false);
         if let Some(entry) = dir_entries.last() {
-            let path = entry.path();
-            iterate_folders(&path, levels, t, config)?;
+            iterate_folders(&entry.path(), levels, t, config)?;
         }
         levels.pop();
     }
@@ -227,8 +224,7 @@ fn main() {
         max_level: max_level,
     };
 
-    let path = matches.value_of("DIR").unwrap_or(".");
-    let path = Path::new(path);
+    let path = Path::new(matches.value_of("DIR").unwrap_or("."));
 
     let mut vec: Vec<bool> = Vec::new();
     let mut t = term::stdout().unwrap();
