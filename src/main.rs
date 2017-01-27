@@ -227,7 +227,7 @@ fn main() {
 
 
     let max_level = if let Some(level) = matches.value_of("level") {
-        level.parse::<usize>().expect("Should have validated that this value was int...")
+        int_validator(&level).expect("Should have validated that this value was int...")
     } else {
         usize::max_value()
     };
