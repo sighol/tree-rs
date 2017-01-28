@@ -112,8 +112,19 @@ fn print_path(path: &Path,
     }
 }
 
-fn is_hidden(file_name: &str) -> bool {
+fn is_hidden_file_name(file_name: &str) -> bool {
     file_name != "." && file_name != ".." && file_name.starts_with(".")
+}
+
+fn is_hidden_path(dir: &Path) -> bool {
+    dir.components()
+        .last()
+        .and_then(|x| {
+            let str = x.as_ref()
+                .to_str()
+                .unwrap_or("");
+            Some(is_hidden_file_name(str))
+        }).unwrap_or(false)
 }
 
 fn iterate_folders(path: &Path,
@@ -122,7 +133,7 @@ fn iterate_folders(path: &Path,
                    config: &Config)
                    -> io::Result<()> {
     let file_name = path_to_str(path);
-    if !config.show_hidden && is_hidden(file_name) {
+    if !config.show_hidden && is_hidden_path(path) {
         return Ok(());
     }
 
@@ -214,7 +225,6 @@ fn main() {
 
     let use_color = matches.is_present("color_on") || !matches.is_present("color_off");
 
-
     let max_level = if let Some(level) = matches.value_of("level") {
         to_int(&level).expect("Should have validated that this value was int...")
     } else {
@@ -237,6 +247,18 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use std::path::Path;
+    use super::*;
+
+    #[test]
+    fn test_is_hidden() {
+        assert!(true == is_hidden_file_name(".git"));
+        assert!(false == is_hidden_file_name("."));
+        assert!(false == is_hidden_file_name(".."));
+
+        assert!(false == is_hidden_path(&Path::new(".")));
+        assert!(false == is_hidden_path(&Path::new("..")));
+        assert!(false == is_hidden_path(&Path::new("../..")));
+    }
 
     #[test]
     fn path_is_file_is_dir() {
