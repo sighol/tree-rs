@@ -113,7 +113,7 @@ fn print_path(path: &Path,
 }
 
 fn is_hidden(file_name: &str) -> bool {
-    file_name != "." && file_name.starts_with(".")
+    file_name != "." && file_name != ".." && file_name.starts_with(".")
 }
 
 fn iterate_folders(path: &Path,
