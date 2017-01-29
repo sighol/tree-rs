@@ -6,6 +6,7 @@ use term::color;
 use std::fs::{self, DirEntry};
 use std::path::Path;
 use std::io;
+use std::io::{Stdout, BufWriter};
 
 use std::cmp::Ordering;
 
@@ -39,12 +40,14 @@ fn get_sorted_dir_entries(path: &Path) -> io::Result<Vec<DirEntry>> {
         })
 }
 
-fn line_prefix(levels: &mut Vec<bool>) -> String {
+fn line_prefix<'a>(levels: &mut Vec<bool>, prefix_buffer: &'a mut String) -> &'a mut String {
     let len        = levels.len();
     let index      = len.saturating_sub(1);
     // factor = 4, because in each iteration pushes at least 3 chars in if/else plus one in the
     // for{} block, plus 4 in the last if{} in this function
-    let mut prefix = String::with_capacity((len * 4) + 4);
+    let mut prefix = prefix_buffer;
+    // we are reusing the prefix buffer from a previous iteration, so clear it
+    prefix.clear();
     for level in levels.iter().take(index) {
         if *level {
             prefix.push(dirsign::VERT);
@@ -75,7 +78,7 @@ fn line_prefix(levels: &mut Vec<bool>) -> String {
     prefix
 }
 
-fn write_color(t: &mut Box<term::StdoutTerminal>,
+fn write_color(t: &mut TerminalType,
                config: &Config,
                color: color::Color,
                str: &str)
@@ -95,13 +98,10 @@ fn write_color(t: &mut Box<term::StdoutTerminal>,
 
 fn print_path(is_dir: bool,
               file_name: &str,
-              levels: &mut Vec<bool>,
-              t: &mut Box<term::StdoutTerminal>,
-              config: &Config)
+              t: &mut TerminalType,
+              config: &Config,
+              prefix: &str)
               -> io::Result<()> {
-
-    let prefix = line_prefix(levels);
-
     write!(t, "{}", prefix)?;
     if is_dir {
         write_color(t, config, color::BRIGHT_BLUE, file_name)?;
@@ -128,8 +128,9 @@ fn is_hidden_path(dir: &Path) -> bool {
 
 fn iterate_folders(path: &Path,
                    levels: &mut Vec<bool>,
-                   t: &mut Box<term::StdoutTerminal>,
-                   config: &Config)
+                   t: &mut TerminalType,
+                   config: &Config,
+                   prefix_buffer: &mut String)
                    -> io::Result<()> {
     let file_name = path_to_str(path);
     if !config.show_hidden && is_hidden_path(path) {
@@ -137,9 +138,10 @@ fn iterate_folders(path: &Path,
     }
 
     let is_dir = path.is_dir();
+    let mut prefix_buffer = line_prefix(levels, prefix_buffer);
 
     if let Ok(link_path) = fs::read_link(path) {
-        write!(t, "{}", &line_prefix(levels))?;
+        write!(t, "{}", &prefix_buffer)?;
         write_color(t, config, color::BRIGHT_CYAN, file_name)?;
         write!(t, " -> ")?;
         let link_path = format!("{}\n", link_path.display());
@@ -152,7 +154,7 @@ fn iterate_folders(path: &Path,
         return Ok(());
     }
 
-    print_path(is_dir, file_name, levels, t, config)?;
+    print_path(is_dir, file_name, t, config, &prefix_buffer)?;
 
     if levels.len() >= config.max_level {
         return Ok(());
@@ -171,13 +173,13 @@ fn iterate_folders(path: &Path,
         levels.push(true);
         let len_entries = dir_entries.len();
         for entry in dir_entries.iter().take(len_entries.saturating_sub(1)) {
-            iterate_folders(&entry.path(), levels, t, config)?;
+            iterate_folders(&entry.path(), levels, t, config, &mut prefix_buffer)?;
         }
 
         levels.pop();
         levels.push(false);
         if let Some(entry) = dir_entries.last() {
-            iterate_folders(&entry.path(), levels, t, config)?;
+            iterate_folders(&entry.path(), levels, t, config, &mut prefix_buffer)?;
         }
         levels.pop();
     }
@@ -190,6 +192,8 @@ struct Config {
     show_hidden: bool,
     max_level: usize,
 }
+
+type TerminalType = term::Terminal<Output=BufWriter<Stdout>>;
 
 fn to_int(v: &str) -> Result<usize, String> {
     use std::str::FromStr;
@@ -239,8 +243,10 @@ fn main() {
     let path = Path::new(matches.value_of("DIR").unwrap_or("."));
 
     let mut vec: Vec<bool> = Vec::new();
-    let mut t = term::stdout().unwrap();
-    iterate_folders(&path, &mut vec, &mut t, &config).expect("Program failed");
+    let stdout_writer = BufWriter::new(io::stdout());
+    let mut t = term::terminfo::TerminfoTerminal::new(stdout_writer).unwrap();
+    let mut prefix_buffer = String::with_capacity(10);
+    iterate_folders(&path, &mut vec, &mut t, &config, &mut prefix_buffer).expect("Program failed");
 }
 
 #[cfg(test)]
