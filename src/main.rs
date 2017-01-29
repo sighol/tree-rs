@@ -136,22 +136,28 @@ fn iterate_folders(path: &Path,
         return Ok(());
     }
 
-    let is_dir = path.is_dir();
+    // store path metadata to avoid many syscalls
+    let path_metadata = path.symlink_metadata()?;
+
+    let is_dir = path_metadata.is_dir();
     let mut prefix_buffer = line_prefix(levels, prefix_buffer);
 
-    if let Ok(link_path) = fs::read_link(path) {
-        write!(t, "{}", &prefix_buffer)?;
-        write_color(t, config, color::BRIGHT_CYAN, file_name)?;
-        write!(t, " -> ")?;
-        let link_path = format!("{}\n", link_path.display());
-        if is_dir {
-            write_color(t, config, color::BRIGHT_BLUE, &link_path)?;
-        } else {
-            write!(t, "{}", link_path)?;
-        }
+    if path_metadata.file_type().is_symlink() {
+        if  let Ok(link_path) = fs::read_link(path) {
+            write!(t, "{}", &prefix_buffer)?;
+            write_color(t, config, color::BRIGHT_CYAN, file_name)?;
+            write!(t, " -> ")?;
+            let link_path = format!("{}\n", link_path.display());
+            if is_dir {
+                write_color(t, config, color::BRIGHT_BLUE, &link_path)?;
+            } else {
+                write!(t, "{}", link_path)?;
+            }
 
-        return Ok(());
+            return Ok(());
+        }
     }
+    
 
     print_path(is_dir, file_name, t, config, &prefix_buffer)?;
 
