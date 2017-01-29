@@ -249,9 +249,7 @@ mod tests {
     #[test]
     fn test_is_hidden() {
         assert!(true == is_hidden(".git"));
-        assert!(false == is_hidden("."));
-        assert!(false == is_hidden(".."));
-        assert!(false == is_hidden("../.."));
+        assert!(false == is_hidden("file"));
     }
 
     #[test]
