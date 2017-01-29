@@ -20,6 +20,12 @@ The goal is to be compatible with its command line arguments.
 
 ## Installation
 
+From crates.io
+```
+cargo install tree-rs
+```
+
+From github
 ```
 git clone https://github.com/sighol/tree-rs
 cargo install
@@ -27,8 +33,6 @@ cargo install
 
 ## Performance
 
-The performance is not as good as the windows `tree` or linux `tree` commands,
-but it prints way faster than I can read.
+On linux it is a bit faster than the `tree` command.
+Based on a simple benchmark (see `timer.py`), it is about 20% faster.
 
-From small benchmarks, it looks like it is about 2-10 times slower than linux
-`tree`.
