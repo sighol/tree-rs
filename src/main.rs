@@ -113,18 +113,6 @@ fn is_hidden_file_name(file_name: &str) -> bool {
     file_name != "." && file_name != ".." && file_name.starts_with(".")
 }
 
-fn is_hidden_path(dir: &Path) -> bool {
-    dir.components()
-        .last()
-        .and_then(|x| {
-            let str = x.as_ref()
-                .to_str()
-                .unwrap_or("");
-            Some(is_hidden_file_name(str))
-        })
-        .unwrap_or(false)
-}
-
 fn iterate_folders(path: &Path,
                    levels: &mut Vec<bool>,
                    t: &mut TerminalType,
@@ -132,7 +120,7 @@ fn iterate_folders(path: &Path,
                    prefix_buffer: &mut String)
                    -> io::Result<()> {
     let file_name = path_to_str(path);
-    if !config.show_hidden && is_hidden_path(path) {
+    if !config.show_hidden && is_hidden_file_name(file_name) {
         return Ok(());
     }
 
