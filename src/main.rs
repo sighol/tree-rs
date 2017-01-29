@@ -6,6 +6,7 @@ use term::color;
 use std::fs::{self, DirEntry};
 use std::path::Path;
 use std::io;
+use std::io::{Stdout, BufWriter};
 
 use std::cmp::Ordering;
 
@@ -77,7 +78,7 @@ fn line_prefix<'a>(levels: &mut Vec<bool>, prefix_buffer: &'a mut String) -> &'a
     prefix
 }
 
-fn write_color(t: &mut Box<term::StdoutTerminal>,
+fn write_color(t: &mut TerminalType,
                config: &Config,
                color: color::Color,
                str: &str)
@@ -97,7 +98,7 @@ fn write_color(t: &mut Box<term::StdoutTerminal>,
 
 fn print_path(is_dir: bool,
               file_name: &str,
-              t: &mut Box<term::StdoutTerminal>,
+              t: &mut TerminalType,
               config: &Config,
               prefix: &str)
               -> io::Result<()> {
@@ -127,7 +128,7 @@ fn is_hidden_path(dir: &Path) -> bool {
 
 fn iterate_folders(path: &Path,
                    levels: &mut Vec<bool>,
-                   t: &mut Box<term::StdoutTerminal>,
+                   t: &mut TerminalType,
                    config: &Config,
                    prefix_buffer: &mut String)
                    -> io::Result<()> {
@@ -192,6 +193,8 @@ struct Config {
     max_level: usize,
 }
 
+type TerminalType = term::Terminal<Output=BufWriter<Stdout>>;
+
 fn to_int(v: &str) -> Result<usize, String> {
     use std::str::FromStr;
 
@@ -240,7 +243,8 @@ fn main() {
     let path = Path::new(matches.value_of("DIR").unwrap_or("."));
 
     let mut vec: Vec<bool> = Vec::new();
-    let mut t = term::stdout().unwrap();
+    let stdout_writer = BufWriter::new(io::stdout());
+    let mut t = term::terminfo::TerminfoTerminal::new(stdout_writer).unwrap();
     let mut prefix_buffer = String::with_capacity(10);
     iterate_folders(&path, &mut vec, &mut t, &config, &mut prefix_buffer).expect("Program failed");
 }
