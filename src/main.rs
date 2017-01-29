@@ -97,7 +97,7 @@ fn write_color(t: &mut Box<term::StdoutTerminal>,
     Ok(())
 }
 
-fn print_path(path: &Path,
+fn print_path(is_dir: bool,
               file_name: &str,
               levels: &mut Vec<bool>,
               t: &mut Box<term::StdoutTerminal>,
@@ -107,7 +107,7 @@ fn print_path(path: &Path,
     let prefix = line_prefix(levels);
 
     write!(t, "{}", prefix)?;
-    if path.is_dir() {
+    if is_dir {
         write_color(t, config, color::BRIGHT_BLUE, file_name)?;
         writeln!(t, "")
     } else {
@@ -156,7 +156,7 @@ fn iterate_folders(path: &Path,
         return Ok(());
     }
 
-    print_path(&path, file_name, levels, t, config)?;
+    print_path(is_dir, file_name, levels, t, config)?;
 
     if levels.len() >= config.max_level {
         return Ok(());
