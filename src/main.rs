@@ -113,18 +113,6 @@ fn is_hidden_file_name(file_name: &str) -> bool {
     file_name != "." && file_name != ".." && file_name.starts_with(".")
 }
 
-fn is_hidden_path(dir: &Path) -> bool {
-    dir.components()
-        .last()
-        .and_then(|x| {
-            let str = x.as_ref()
-                .to_str()
-                .unwrap_or("");
-            Some(is_hidden_file_name(str))
-        })
-        .unwrap_or(false)
-}
-
 fn iterate_folders(path: &Path,
                    levels: &mut Vec<bool>,
                    t: &mut TerminalType,
@@ -132,26 +120,32 @@ fn iterate_folders(path: &Path,
                    prefix_buffer: &mut String)
                    -> io::Result<()> {
     let file_name = path_to_str(path);
-    if !config.show_hidden && is_hidden_path(path) {
+    if !config.show_hidden && is_hidden_file_name(file_name) {
         return Ok(());
     }
 
-    let is_dir = path.is_dir();
+    // store path metadata to avoid many syscalls
+    let path_metadata = path.symlink_metadata()?;
+
+    let is_dir = path_metadata.is_dir();
     let mut prefix_buffer = line_prefix(levels, prefix_buffer);
 
-    if let Ok(link_path) = fs::read_link(path) {
-        write!(t, "{}", &prefix_buffer)?;
-        write_color(t, config, color::BRIGHT_CYAN, file_name)?;
-        write!(t, " -> ")?;
-        let link_path = format!("{}\n", link_path.display());
-        if is_dir {
-            write_color(t, config, color::BRIGHT_BLUE, &link_path)?;
-        } else {
-            write!(t, "{}", link_path)?;
-        }
+    if path_metadata.file_type().is_symlink() {
+        if  let Ok(link_path) = fs::read_link(path) {
+            write!(t, "{}", &prefix_buffer)?;
+            write_color(t, config, color::BRIGHT_CYAN, file_name)?;
+            write!(t, " -> ")?;
+            let link_path = format!("{}\n", link_path.display());
+            if is_dir {
+                write_color(t, config, color::BRIGHT_BLUE, &link_path)?;
+            } else {
+                write!(t, "{}", link_path)?;
+            }
 
-        return Ok(());
+            return Ok(());
+        }
     }
+    
 
     print_path(is_dir, file_name, t, config, &prefix_buffer)?;
 
