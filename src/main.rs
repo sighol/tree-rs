@@ -94,18 +94,17 @@ fn write_color(t: &mut TerminalType,
     Ok(())
 }
 
-fn print_path(is_dir: bool,
-              file_name: &str,
+fn print_path(file_name: &str,
+              metadata: &fs::Metadata,
               t: &mut TerminalType,
-              config: &Config,
-              prefix: &str)
+              config: &Config)
               -> io::Result<()> {
-    write!(t, "{}", prefix)?;
-    if is_dir {
-        write_color(t, config, color::BRIGHT_BLUE, file_name)?;
-        writeln!(t, "")
+    if metadata.is_dir() {
+        write_color(t, config, color::BRIGHT_BLUE, file_name)
+    } else if is_executable(metadata) {
+        write_color(t, config, color::BRIGHT_GREEN, file_name)
     } else {
-        writeln!(t, "{}", file_name)
+        write!(t, "{}", file_name)
     }
 }
 
@@ -132,6 +131,18 @@ impl DirEntrySummary {
     }
 }
 
+#[cfg(not(target_os = "linux"))]
+fn is_executable(metadata: &fs::Metadata) -> bool {
+    false
+}
+
+#[cfg(target_os = "linux")]
+fn is_executable(metadata: &fs::Metadata) -> bool {
+    use std::os::unix::fs::PermissionsExt;
+    let mode = metadata.permissions().mode();
+    (mode & 0o100) != 0
+}
+
 fn iterate_folders(path: &Path,
                    levels: &mut Vec<bool>,
                    t: &mut TerminalType,
@@ -150,8 +161,7 @@ fn iterate_folders(path: &Path,
     let is_dir = path_metadata.is_dir();
 
     // Do not count root folder in summary
-    if levels.len() > 0
-    {
+    if levels.len() > 0 {
         if is_dir {
             summary.num_folders += 1;
         } else {
@@ -162,22 +172,26 @@ fn iterate_folders(path: &Path,
     let mut prefix_buffer = line_prefix(levels, prefix_buffer);
 
     if path_metadata.file_type().is_symlink() {
-        if  let Ok(link_path) = fs::read_link(path) {
+        if let Ok(link_path) = fs::read_link(path) {
             write!(t, "{}", &prefix_buffer)?;
             write_color(t, config, color::BRIGHT_CYAN, file_name)?;
             write!(t, " -> ")?;
-            let link_path = format!("{}\n", link_path.display());
-            if is_dir {
-                write_color(t, config, color::BRIGHT_BLUE, &link_path)?;
-            } else {
-                write!(t, "{}", link_path)?;
-            }
+            let link_file_name = format!("{}", link_path.display());
+            
+            // BUG: Currently prints all symlinks as executable, since the
+            // metadata is for the symlink itself. Need to find a way to get new
+            // metadata from the symlink. path.metadata()? will sometimes return
+            // Err, as may calling link_path.metadata()?;
+            print_path(&link_file_name, &path_metadata, t, config)?;
+            writeln!(t, "")?;
 
             return Ok(summary);
         }
     }
-    
-    print_path(is_dir, file_name, t, config, &prefix_buffer)?;
+
+    write!(t, "{}", &prefix_buffer)?;
+    print_path(file_name, &path_metadata, t, config)?;
+    writeln!(t, "")?;
 
     if levels.len() >= config.max_level {
         return Ok(summary);
@@ -196,14 +210,16 @@ fn iterate_folders(path: &Path,
         levels.push(true);
         let len_entries = dir_entries.len();
         for entry in dir_entries.iter().take(len_entries.saturating_sub(1)) {
-            let sub_summary = iterate_folders(&entry.path(), levels, t, config, &mut prefix_buffer)?;
+            let sub_summary =
+                iterate_folders(&entry.path(), levels, t, config, &mut prefix_buffer)?;
             summary.add(&sub_summary);
         }
 
         levels.pop();
         levels.push(false);
         if let Some(entry) = dir_entries.last() {
-            let sub_summary = iterate_folders(&entry.path(), levels, t, config, &mut prefix_buffer)?;
+            let sub_summary =
+                iterate_folders(&entry.path(), levels, t, config, &mut prefix_buffer)?;
             summary.add(&sub_summary);
         }
         levels.pop();
@@ -270,10 +286,15 @@ fn main() {
     let stdout_writer = BufWriter::new(io::stdout());
     let mut t = term::terminfo::TerminfoTerminal::new(stdout_writer).unwrap();
     let mut prefix_buffer = String::with_capacity(10);
-    let summary = iterate_folders(&path, &mut vec, &mut t, &config, &mut prefix_buffer).expect("Program failed");
+    let summary = iterate_folders(&path, &mut vec, &mut t, &config, &mut prefix_buffer)
+        .expect("Program failed");
 
     let my_term: &mut TerminalType = &mut t;
-    writeln!(my_term, "\n{} directories, {} files", summary.num_folders, summary.num_files).expect("Failed to print summary");
+    writeln!(my_term,
+             "\n{} directories, {} files",
+             summary.num_folders,
+             summary.num_files)
+        .expect("Failed to print summary");
 }
 
 #[cfg(test)]
