@@ -113,21 +113,52 @@ fn is_hidden(file_name: &str) -> bool {
     file_name.starts_with(".")
 }
 
+struct DirEntrySummary {
+    num_folders: usize,
+    num_files: usize,
+}
+
+impl DirEntrySummary {
+    fn new() -> DirEntrySummary {
+        DirEntrySummary {
+            num_folders: 0,
+            num_files: 0,
+        }
+    }
+
+    fn add(&mut self, other: &DirEntrySummary) {
+        self.num_files += other.num_files;
+        self.num_folders += other.num_folders;
+    }
+}
+
 fn iterate_folders(path: &Path,
                    levels: &mut Vec<bool>,
                    t: &mut TerminalType,
                    config: &Config,
                    prefix_buffer: &mut String)
-                   -> io::Result<()> {
+                   -> io::Result<DirEntrySummary> {
+    let mut summary = DirEntrySummary::new();
     let file_name = path_to_str(path);
     if !config.show_hidden && levels.len() > 0 && is_hidden(file_name) {
-        return Ok(());
+        return Ok(summary);
     }
 
     // store path metadata to avoid many syscalls
     let path_metadata = path.symlink_metadata()?;
 
     let is_dir = path_metadata.is_dir();
+
+    // Do not count root folder in summary
+    if levels.len() > 0
+    {
+        if is_dir {
+            summary.num_folders += 1;
+        } else {
+            summary.num_files += 1;
+        }
+    }
+
     let mut prefix_buffer = line_prefix(levels, prefix_buffer);
 
     if path_metadata.file_type().is_symlink() {
@@ -142,15 +173,14 @@ fn iterate_folders(path: &Path,
                 write!(t, "{}", link_path)?;
             }
 
-            return Ok(());
+            return Ok(summary);
         }
     }
     
-
     print_path(is_dir, file_name, t, config, &prefix_buffer)?;
 
     if levels.len() >= config.max_level {
-        return Ok(());
+        return Ok(summary);
     }
 
     if is_dir {
@@ -158,7 +188,7 @@ fn iterate_folders(path: &Path,
         if let Err(err) = dir_entries {
             let error_msg = format!("Could not read directory '{}': {}\n", path.display(), err);
             write_color(t, config, color::RED, &error_msg)?;
-            return Ok(());
+            return Ok(summary);
         }
 
         let dir_entries = dir_entries.unwrap();
@@ -166,18 +196,20 @@ fn iterate_folders(path: &Path,
         levels.push(true);
         let len_entries = dir_entries.len();
         for entry in dir_entries.iter().take(len_entries.saturating_sub(1)) {
-            iterate_folders(&entry.path(), levels, t, config, &mut prefix_buffer)?;
+            let sub_summary = iterate_folders(&entry.path(), levels, t, config, &mut prefix_buffer)?;
+            summary.add(&sub_summary);
         }
 
         levels.pop();
         levels.push(false);
         if let Some(entry) = dir_entries.last() {
-            iterate_folders(&entry.path(), levels, t, config, &mut prefix_buffer)?;
+            let sub_summary = iterate_folders(&entry.path(), levels, t, config, &mut prefix_buffer)?;
+            summary.add(&sub_summary);
         }
         levels.pop();
     }
 
-    Ok(())
+    Ok(summary)
 }
 
 struct Config {
@@ -238,7 +270,10 @@ fn main() {
     let stdout_writer = BufWriter::new(io::stdout());
     let mut t = term::terminfo::TerminfoTerminal::new(stdout_writer).unwrap();
     let mut prefix_buffer = String::with_capacity(10);
-    iterate_folders(&path, &mut vec, &mut t, &config, &mut prefix_buffer).expect("Program failed");
+    let summary = iterate_folders(&path, &mut vec, &mut t, &config, &mut prefix_buffer).expect("Program failed");
+
+    let my_term: &mut TerminalType = &mut t;
+    writeln!(my_term, "\n{} directories, {} files", summary.num_folders, summary.num_files).expect("Failed to print summary");
 }
 
 #[cfg(test)]
