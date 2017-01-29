@@ -109,8 +109,8 @@ fn print_path(is_dir: bool,
     }
 }
 
-fn is_hidden_file_name(file_name: &str) -> bool {
-    file_name != "." && file_name != ".." && file_name.starts_with(".")
+fn is_hidden(file_name: &str) -> bool {
+    file_name.starts_with(".")
 }
 
 fn iterate_folders(path: &Path,
@@ -120,7 +120,7 @@ fn iterate_folders(path: &Path,
                    prefix_buffer: &mut String)
                    -> io::Result<()> {
     let file_name = path_to_str(path);
-    if !config.show_hidden && is_hidden_file_name(file_name) {
+    if !config.show_hidden && levels.len() > 0 && is_hidden(file_name) {
         return Ok(());
     }
 
@@ -248,13 +248,10 @@ mod tests {
 
     #[test]
     fn test_is_hidden() {
-        assert!(true == is_hidden_file_name(".git"));
-        assert!(false == is_hidden_file_name("."));
-        assert!(false == is_hidden_file_name(".."));
-
-        assert!(false == is_hidden_path(&Path::new(".")));
-        assert!(false == is_hidden_path(&Path::new("..")));
-        assert!(false == is_hidden_path(&Path::new("../..")));
+        assert!(true == is_hidden(".git"));
+        assert!(false == is_hidden("."));
+        assert!(false == is_hidden(".."));
+        assert!(false == is_hidden("../.."));
     }
 
     #[test]
