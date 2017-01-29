@@ -32,17 +32,16 @@ fn order_dir_entry(a: &DirEntry, b: &DirEntry) -> Ordering {
 }
 
 fn get_sorted_dir_entries(path: &Path) -> io::Result<Vec<DirEntry>> {
-    fs::read_dir(path)
-        .map(|entries| {
-            let mut dir_entries : Vec<DirEntry> = entries.filter_map(Result::ok).collect();
-            dir_entries.sort_by(order_dir_entry);
-            dir_entries
-        })
+    fs::read_dir(path).map(|entries| {
+        let mut dir_entries: Vec<DirEntry> = entries.filter_map(Result::ok).collect();
+        dir_entries.sort_by(order_dir_entry);
+        dir_entries
+    })
 }
 
 fn line_prefix<'a>(levels: &mut Vec<bool>, prefix_buffer: &'a mut String) -> &'a mut String {
-    let len        = levels.len();
-    let index      = len.saturating_sub(1);
+    let len = levels.len();
+    let index = len.saturating_sub(1);
     // factor = 4, because in each iteration pushes at least 3 chars in if/else plus one in the
     // for{} block, plus 4 in the last if{} in this function
     let mut prefix = prefix_buffer;
@@ -51,13 +50,12 @@ fn line_prefix<'a>(levels: &mut Vec<bool>, prefix_buffer: &'a mut String) -> &'a
     for level in levels.iter().take(index) {
         if *level {
             prefix.push(dirsign::VERT);
-            for _ in 0..2 {
-                prefix.push(dirsign::BLANK)
-            }
+            prefix.push(dirsign::BLANK);
+            prefix.push(dirsign::BLANK);
         } else {
-            for _ in 0..3 {
-                prefix.push(' ');
-            }
+            prefix.push(' ');
+            prefix.push(' ');
+            prefix.push(' ');
         }
 
         prefix.push(' ');
@@ -123,7 +121,8 @@ fn is_hidden_path(dir: &Path) -> bool {
                 .to_str()
                 .unwrap_or("");
             Some(is_hidden_file_name(str))
-        }).unwrap_or(false)
+        })
+        .unwrap_or(false)
 }
 
 fn iterate_folders(path: &Path,
@@ -193,13 +192,12 @@ struct Config {
     max_level: usize,
 }
 
-type TerminalType = term::Terminal<Output=BufWriter<Stdout>>;
+type TerminalType = term::Terminal<Output = BufWriter<Stdout>>;
 
 fn to_int(v: &str) -> Result<usize, String> {
     use std::str::FromStr;
 
-    FromStr::from_str(v)
-        .map_err(|e| format!("Could not parse '{}' as an integer: {}", &v, e))
+    FromStr::from_str(v).map_err(|e| format!("Could not parse '{}' as an integer: {}", &v, e))
 }
 
 fn main() {
