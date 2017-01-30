@@ -6,7 +6,6 @@ use term::color;
 use std::fs::{self, DirEntry};
 use std::path::Path;
 use std::io;
-use std::io::{Stdout, BufWriter};
 
 use std::cmp::Ordering;
 
@@ -42,7 +41,7 @@ fn get_sorted_dir_entries(path: &Path) -> io::Result<Vec<DirEntry>> {
 fn set_line_prefix(levels: &Vec<bool>, prefix: &mut String) {
     let len = levels.len();
     let index = len.saturating_sub(1);
-    
+
     prefix.clear();
     for level in levels.iter().take(index) {
         if *level {
@@ -144,7 +143,11 @@ struct Config {
     max_level: usize,
 }
 
-type TerminalType = term::Terminal<Output = BufWriter<Stdout>>;
+type TerminalType = Box<term::StdoutTerminal>;
+
+fn get_terminal_printer() -> TerminalType {
+    term::stdout().expect("Could not unwrap term::stdout.")
+}
 
 struct TreePrinter<'a> {
     term: &'a mut TerminalType,
@@ -288,22 +291,19 @@ fn main() {
 
     let path = Path::new(matches.value_of("DIR").unwrap_or("."));
 
-    let stdout_writer = BufWriter::new(io::stdout());
-    let mut t = term::terminfo::TerminfoTerminal::new(stdout_writer)
-        .expect("Could not unwrap terminal info");
-
+    let mut term = get_terminal_printer();
     let summary = {
-        let mut p = TreePrinter::new(config, &mut t);
+        let mut p = TreePrinter::new(config, &mut term);
         p.iterate_folders(&path).expect("Program failed")
     };
 
-    let my_term: &mut TerminalType = &mut t;
-    writeln!(my_term,
+    writeln!(&mut term,
              "\n{} directories, {} files",
              summary.num_folders,
              summary.num_files)
         .expect("Failed to print summary");
 }
+
 
 #[cfg(test)]
 mod tests {
