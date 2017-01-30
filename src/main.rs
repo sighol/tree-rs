@@ -39,13 +39,10 @@ fn get_sorted_dir_entries(path: &Path) -> io::Result<Vec<DirEntry>> {
     })
 }
 
-fn line_prefix<'a>(levels: &mut Vec<bool>, prefix_buffer: &'a mut String) -> &'a mut String {
+fn set_line_prefix(levels: &Vec<bool>, prefix: &mut String) {
     let len = levels.len();
     let index = len.saturating_sub(1);
-    // factor = 4, because in each iteration pushes at least 3 chars in if/else plus one in the
-    // for{} block, plus 4 in the last if{} in this function
-    let mut prefix = prefix_buffer;
-    // we are reusing the prefix buffer from a previous iteration, so clear it
+    
     prefix.clear();
     for level in levels.iter().take(index) {
         if *level {
@@ -72,8 +69,6 @@ fn line_prefix<'a>(levels: &mut Vec<bool>, prefix_buffer: &'a mut String) -> &'a
         prefix.push(dirsign::HORZ);
         prefix.push(' ');
     }
-
-    prefix
 }
 
 fn write_color(t: &mut TerminalType,
@@ -143,91 +138,6 @@ fn is_executable(metadata: &fs::Metadata) -> bool {
     (mode & 0o100) != 0
 }
 
-fn iterate_folders(path: &Path,
-                   levels: &mut Vec<bool>,
-                   t: &mut TerminalType,
-                   config: &Config,
-                   prefix_buffer: &mut String)
-                   -> io::Result<DirEntrySummary> {
-    let mut summary = DirEntrySummary::new();
-    let file_name = path_to_str(path);
-    if !config.show_hidden && levels.len() > 0 && is_hidden(file_name) {
-        return Ok(summary);
-    }
-
-    // store path metadata to avoid many syscalls
-    let path_metadata = path.symlink_metadata()?;
-
-    let is_dir = path_metadata.is_dir();
-
-    // Do not count root folder in summary
-    if levels.len() > 0 {
-        if is_dir {
-            summary.num_folders += 1;
-        } else {
-            summary.num_files += 1;
-        }
-    }
-
-    let mut prefix_buffer = line_prefix(levels, prefix_buffer);
-
-    if path_metadata.file_type().is_symlink() {
-        if let Ok(link_path) = fs::read_link(path) {
-            write!(t, "{}", &prefix_buffer)?;
-            write_color(t, config, color::BRIGHT_CYAN, file_name)?;
-            write!(t, " -> ")?;
-            let link_file_name = format!("{}", link_path.display());
-            
-            // BUG: Currently prints all symlinks as executable, since the
-            // metadata is for the symlink itself. Need to find a way to get new
-            // metadata from the symlink. path.metadata()? will sometimes return
-            // Err, as may calling link_path.metadata()?;
-            print_path(&link_file_name, &path_metadata, t, config)?;
-            writeln!(t, "")?;
-
-            return Ok(summary);
-        }
-    }
-
-    write!(t, "{}", &prefix_buffer)?;
-    print_path(file_name, &path_metadata, t, config)?;
-    writeln!(t, "")?;
-
-    if levels.len() >= config.max_level {
-        return Ok(summary);
-    }
-
-    if is_dir {
-        let dir_entries = get_sorted_dir_entries(path);
-        if let Err(err) = dir_entries {
-            let error_msg = format!("Could not read directory '{}': {}\n", path.display(), err);
-            write_color(t, config, color::RED, &error_msg)?;
-            return Ok(summary);
-        }
-
-        let dir_entries = dir_entries.unwrap();
-
-        levels.push(true);
-        let len_entries = dir_entries.len();
-        for entry in dir_entries.iter().take(len_entries.saturating_sub(1)) {
-            let sub_summary =
-                iterate_folders(&entry.path(), levels, t, config, &mut prefix_buffer)?;
-            summary.add(&sub_summary);
-        }
-
-        levels.pop();
-        levels.push(false);
-        if let Some(entry) = dir_entries.last() {
-            let sub_summary =
-                iterate_folders(&entry.path(), levels, t, config, &mut prefix_buffer)?;
-            summary.add(&sub_summary);
-        }
-        levels.pop();
-    }
-
-    Ok(summary)
-}
-
 struct Config {
     use_color: bool,
     show_hidden: bool,
@@ -235,6 +145,102 @@ struct Config {
 }
 
 type TerminalType = term::Terminal<Output = BufWriter<Stdout>>;
+
+struct TreePrinter<'a> {
+    term: &'a mut TerminalType,
+    config: Config,
+    prefix_buffer: String,
+    levels: Vec<bool>,
+}
+
+impl<'a> TreePrinter<'a> {
+    fn new(config: Config, term: &'a mut TerminalType) -> TreePrinter<'a> {
+        TreePrinter {
+            config: config,
+            term: term,
+            prefix_buffer: String::new(),
+            levels: Vec::new(),
+        }
+    }
+
+    fn iterate_folders(&mut self, path: &Path) -> io::Result<DirEntrySummary> {
+        let mut summary = DirEntrySummary::new();
+        let file_name = path_to_str(path);
+        if !self.config.show_hidden && self.levels.len() > 0 && is_hidden(file_name) {
+            return Ok(summary);
+        }
+
+        // store path metadata to avoid many syscalls
+        let path_metadata = path.symlink_metadata()?;
+
+        let is_dir = path_metadata.is_dir();
+
+        // Do not count root folder in summary
+        if self.levels.len() > 0 {
+            if is_dir {
+                summary.num_folders += 1;
+            } else {
+                summary.num_files += 1;
+            }
+        }
+
+        set_line_prefix(&self.levels, &mut self.prefix_buffer);
+
+        if path_metadata.file_type().is_symlink() {
+            if let Ok(link_path) = fs::read_link(path) {
+                write!(self.term, "{}", &self.prefix_buffer)?;
+                write_color(self.term, &self.config, color::BRIGHT_CYAN, file_name)?;
+                write!(self.term, " -> ")?;
+                let link_file_name = format!("{}", link_path.display());
+
+                // BUG: Currently prints all symlinks as executable, since the
+                // metadata is for the symlink itself. Need to find a way to get new
+                // metadata from the symlink. path.metadata()? will sometimes return
+                // Err, as may calling link_path.metadata()?;
+                print_path(&link_file_name, &path_metadata, self.term, &self.config)?;
+                writeln!(self.term, "")?;
+
+                return Ok(summary);
+            }
+        }
+
+        write!(self.term, "{}", &self.prefix_buffer)?;
+        print_path(file_name, &path_metadata, self.term, &self.config)?;
+        writeln!(self.term, "")?;
+
+        if self.levels.len() >= self.config.max_level {
+            return Ok(summary);
+        }
+
+        if is_dir {
+            let dir_entries = get_sorted_dir_entries(path);
+            if let Err(err) = dir_entries {
+                let error_msg = format!("Could not read directory '{}': {}\n", path.display(), err);
+                write_color(self.term, &self.config, color::RED, &error_msg)?;
+                return Ok(summary);
+            }
+
+            let dir_entries = dir_entries.unwrap();
+
+            self.levels.push(true);
+            let len_entries = dir_entries.len();
+            for entry in dir_entries.iter().take(len_entries.saturating_sub(1)) {
+                let sub_summary = self.iterate_folders(&entry.path())?;
+                summary.add(&sub_summary);
+            }
+
+            self.levels.pop();
+            self.levels.push(false);
+            if let Some(entry) = dir_entries.last() {
+                let sub_summary = self.iterate_folders(&entry.path())?;
+                summary.add(&sub_summary);
+            }
+            self.levels.pop();
+        }
+
+        Ok(summary)
+    }
+}
 
 fn to_int(v: &str) -> Result<usize, String> {
     use std::str::FromStr;
@@ -280,15 +286,16 @@ fn main() {
         max_level: max_level,
     };
 
-
     let path = Path::new(matches.value_of("DIR").unwrap_or("."));
 
-    let mut vec: Vec<bool> = Vec::new();
     let stdout_writer = BufWriter::new(io::stdout());
-    let mut t = term::terminfo::TerminfoTerminal::new(stdout_writer).expect("Could not unwrap terminal info");
-    let mut prefix_buffer = String::with_capacity(10);
-    let summary = iterate_folders(&path, &mut vec, &mut t, &config, &mut prefix_buffer)
-        .expect("Program failed");
+    let mut t = term::terminfo::TerminfoTerminal::new(stdout_writer)
+        .expect("Could not unwrap terminal info");
+
+    let summary = {
+        let mut p = TreePrinter::new(config, &mut t);
+        p.iterate_folders(&path).expect("Program failed")
+    };
 
     let my_term: &mut TerminalType = &mut t;
     writeln!(my_term,
