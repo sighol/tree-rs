@@ -280,11 +280,12 @@ fn main() {
         max_level: max_level,
     };
 
+
     let path = Path::new(matches.value_of("DIR").unwrap_or("."));
 
     let mut vec: Vec<bool> = Vec::new();
     let stdout_writer = BufWriter::new(io::stdout());
-    let mut t = term::terminfo::TerminfoTerminal::new(stdout_writer).unwrap();
+    let mut t = term::terminfo::TerminfoTerminal::new(stdout_writer).expect("Could not unwrap terminal info");
     let mut prefix_buffer = String::with_capacity(10);
     let summary = iterate_folders(&path, &mut vec, &mut t, &config, &mut prefix_buffer)
         .expect("Program failed");
