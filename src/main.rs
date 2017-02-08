@@ -1,13 +1,15 @@
 extern crate term;
 extern crate clap;
-extern crate regex;
+extern crate globset;
 
-use regex::Regex;
+use globset::{Glob, GlobMatcher};
 
 use term::color;
 
+use std::collections::VecDeque;
+
 use std::fs::{self, DirEntry, Metadata};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::io;
 
 use std::cmp::Ordering;
@@ -144,6 +146,7 @@ struct Config {
     use_color: bool,
     show_hidden: bool,
     max_level: usize,
+    include_regex: Option<GlobMatcher>,
 }
 
 type TerminalType = Box<term::StdoutTerminal>;
@@ -155,11 +158,13 @@ fn get_terminal_printer() -> TerminalType {
 struct TreePrinterCacheItem {
     metadata: Metadata,
     levels: Vec<bool>,
+    path: PathBuf,
 }
 
 impl TreePrinterCacheItem {
-    fn new(metadata: Metadata, levels: Vec<bool>) -> TreePrinterCacheItem {
+    fn new(path: PathBuf, metadata: Metadata, levels: Vec<bool>) -> TreePrinterCacheItem {
         TreePrinterCacheItem {
+            path: path,
             metadata: metadata,
             levels: levels,
         }
@@ -167,14 +172,12 @@ impl TreePrinterCacheItem {
 }
 
 struct TreePrinterCache {
-    items: Vec<TreePrinterCacheItem>,
+    items: VecDeque<TreePrinterCacheItem>,
 }
 
 impl TreePrinterCache {
     fn new() -> TreePrinterCache {
-        TreePrinterCache {
-            items: Vec::new(),
-        }
+        TreePrinterCache { items: VecDeque::new() }
     }
 }
 
@@ -183,7 +186,6 @@ struct TreePrinter<'a> {
     config: Config,
     prefix_buffer: String,
     levels: Vec<bool>,
-    include_regex: Regex,
     cache: TreePrinterCache,
 }
 
@@ -195,7 +197,6 @@ impl<'a> TreePrinter<'a> {
             prefix_buffer: String::new(),
             levels: Vec::new(),
             cache: TreePrinterCache::new(),
-            include_regex: Regex::new(r".*\.rs").unwrap(),
         }
     }
 
@@ -211,54 +212,86 @@ impl<'a> TreePrinter<'a> {
 
         let is_dir = path_metadata.is_dir();
 
-        // Do not count root folder in summary
-        if self.levels.len() > 0 {
-            if is_dir {
-                summary.num_folders += 1;
-            } else {
-                summary.num_files += 1;
-            }
-        }
-
         set_line_prefix(&self.levels, &mut self.prefix_buffer);
-
-        if path_metadata.file_type().is_symlink() {
-            if let Ok(link_path) = fs::read_link(path) {
-                write!(self.term, "{}", &self.prefix_buffer)?;
-                write_color(self.term, &self.config, color::BRIGHT_CYAN, file_name)?;
-                write!(self.term, " -> ")?;
-                let link_file_name = format!("{}", link_path.display());
-
-                // BUG: Currently prints all symlinks as executable, since the
-                // metadata is for the symlink itself. Need to find a way to get new
-                // metadata from the symlink. path.metadata()? will sometimes return
-                // Err, as may calling link_path.metadata()?;
-                print_path(&link_file_name, &path_metadata, self.term, &self.config)?;
-                writeln!(self.term, "")?;
-
-                return Ok(summary);
-            }
-        }
-
-
-
 
         if self.levels.len() >= self.config.max_level {
             return Ok(summary);
         }
 
+        loop {
+            let should_pop_front = if let Some(last_cache) = self.cache.items.back() {
+                last_cache.levels.len() >= self.levels.len()
+            } else {
+                false
+            };
+
+            if should_pop_front {
+                self.cache.items.pop_back();
+            } else {
+                break;
+            }
+        }
+
         if !is_dir {
-            if self.include_regex.is_match(file_name) {
+            let file_is_included = if let Some(ref include_regex) = self.config.include_regex {
+                include_regex.is_match(file_name)
+            } else {
+                true
+            };
 
+            if file_is_included {
                 // TODO: Print all folders in cache
+                while let Some(item) = self.cache.items.pop_front() {
+                    let mut prefix = String::new();
+                    set_line_prefix(&item.levels, &mut prefix);
+                    write!(self.term, "{}", &prefix)?;
+                    let file_name = path_to_str(&item.path);
+                    print_path(file_name, &item.metadata, self.term, &self.config)?;
+                    writeln!(self.term, "")?;
+                    // Do not count root folder in summary
+                    if item.levels.len() > 0 {
+                        summary.num_folders += 1;
+                    }
+                }
 
+                summary.num_files += 1;
+
+                if path_metadata.file_type().is_symlink() {
+                    if let Ok(link_path) = fs::read_link(path) {
+                        write!(self.term, "{}", &self.prefix_buffer)?;
+                        write_color(self.term, &self.config, color::BRIGHT_CYAN, file_name)?;
+                        write!(self.term, " -> ")?;
+                        let link_file_name = format!("{}", link_path.display());
+
+                        // BUG: Currently prints all symlinks as executable, since the
+                        // metadata is for the symlink itself. Need to find a way to get new
+                        // metadata from the symlink. path.metadata()? will sometimes return
+                        // Err, as may calling link_path.metadata()?;
+                        print_path(&link_file_name, &path_metadata, self.term, &self.config)?;
+                        writeln!(self.term, "")?;
+
+                        return Ok(summary);
+                    }
+                }
 
                 write!(self.term, "{}", &self.prefix_buffer)?;
                 print_path(file_name, &path_metadata, self.term, &self.config)?;
                 writeln!(self.term, "")?;
             }
-
         } else {
+            if self.config.include_regex.is_some() {
+                let item =
+                    TreePrinterCacheItem::new(path.to_owned(), path_metadata, self.levels.clone());
+                self.cache.items.push_back(item);
+            } else {
+                write!(self.term, "{}", &self.prefix_buffer)?;
+                print_path(file_name, &path_metadata, self.term, &self.config)?;
+                writeln!(self.term, "")?;
+
+                if self.levels.len() > 0 {
+                    summary.num_folders += 1;
+                }
+            }
 
             let dir_entries = get_sorted_dir_entries(path);
             if let Err(err) = dir_entries {
@@ -283,6 +316,7 @@ impl<'a> TreePrinter<'a> {
                 summary.add(&sub_summary);
             }
             self.levels.pop();
+
         }
 
         Ok(summary)
@@ -311,6 +345,10 @@ fn main() {
         .arg(Arg::with_name("DIR")
             .index(1)
             .help("Directory you want to search"))
+        .arg(Arg::with_name("include_pattern")
+            .short("P")
+            .takes_value(true)
+            .help("List only those files that match the pattern given"))
         .arg(Arg::with_name("level")
             .short("L")
             .long("level")
@@ -330,6 +368,11 @@ fn main() {
     let config = Config {
         use_color: use_color,
         show_hidden: matches.is_present("a"),
+        include_regex: if let Some(pattern) = matches.value_of("include_pattern") {
+            Some(Glob::new(pattern).expect("include_pattern is not valid").compile_matcher())
+        } else {
+            None
+        },
         max_level: max_level,
     };
 

@@ -1,6 +1,6 @@
 [package]
 name = "tree-rs"
-version = "0.5.0"
+version = "0.5.1"
 authors = ["Sigurd Holsen <sighol@gmail.com>"]
 description = """
 tree-rs is a cross platform incomplete reimplementation of the linux *tree*
@@ -16,4 +16,4 @@ repository = "https://github.com/sighol/tree-rs"
 [dependencies]
 clap = "~2.20"
 term = "0.4.*"
-regex = "*"
+globset = "0.1.3"
