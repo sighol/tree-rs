@@ -16,3 +16,4 @@ repository = "https://github.com/sighol/tree-rs"
 [dependencies]
 clap = "~2.20"
 term = "0.4.*"
+regex = "*"

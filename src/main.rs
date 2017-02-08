@@ -1,9 +1,12 @@
 extern crate term;
 extern crate clap;
+extern crate regex;
+
+use regex::Regex;
 
 use term::color;
 
-use std::fs::{self, DirEntry};
+use std::fs::{self, DirEntry, Metadata};
 use std::path::Path;
 use std::io;
 
@@ -149,11 +152,39 @@ fn get_terminal_printer() -> TerminalType {
     term::stdout().expect("Could not unwrap term::stdout.")
 }
 
+struct TreePrinterCacheItem {
+    metadata: Metadata,
+    levels: Vec<bool>,
+}
+
+impl TreePrinterCacheItem {
+    fn new(metadata: Metadata, levels: Vec<bool>) -> TreePrinterCacheItem {
+        TreePrinterCacheItem {
+            metadata: metadata,
+            levels: levels,
+        }
+    }
+}
+
+struct TreePrinterCache {
+    items: Vec<TreePrinterCacheItem>,
+}
+
+impl TreePrinterCache {
+    fn new() -> TreePrinterCache {
+        TreePrinterCache {
+            items: Vec::new(),
+        }
+    }
+}
+
 struct TreePrinter<'a> {
     term: &'a mut TerminalType,
     config: Config,
     prefix_buffer: String,
     levels: Vec<bool>,
+    include_regex: Regex,
+    cache: TreePrinterCache,
 }
 
 impl<'a> TreePrinter<'a> {
@@ -163,6 +194,8 @@ impl<'a> TreePrinter<'a> {
             term: term,
             prefix_buffer: String::new(),
             levels: Vec::new(),
+            cache: TreePrinterCache::new(),
+            include_regex: Regex::new(r".*\.rs").unwrap(),
         }
     }
 
@@ -207,15 +240,26 @@ impl<'a> TreePrinter<'a> {
             }
         }
 
-        write!(self.term, "{}", &self.prefix_buffer)?;
-        print_path(file_name, &path_metadata, self.term, &self.config)?;
-        writeln!(self.term, "")?;
+
+
 
         if self.levels.len() >= self.config.max_level {
             return Ok(summary);
         }
 
-        if is_dir {
+        if !is_dir {
+            if self.include_regex.is_match(file_name) {
+
+                // TODO: Print all folders in cache
+
+
+                write!(self.term, "{}", &self.prefix_buffer)?;
+                print_path(file_name, &path_metadata, self.term, &self.config)?;
+                writeln!(self.term, "")?;
+            }
+
+        } else {
+
             let dir_entries = get_sorted_dir_entries(path);
             if let Err(err) = dir_entries {
                 let error_msg = format!("Could not read directory '{}': {}\n", path.display(), err);
