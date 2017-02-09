@@ -11,8 +11,8 @@ pub struct IteratorItem {
     pub file_name: String,
     pub path: PathBuf,
     pub metadata: Metadata,
-    pub level: i32,
-    pub is_last_in_folder: bool,
+    pub level: usize,
+    pub is_last: bool,
 }
 
 pub fn path_to_str(path: &Path) -> &str {
@@ -23,7 +23,7 @@ pub fn path_to_str(path: &Path) -> &str {
 }
 
 impl IteratorItem {
-    fn new(path: &Path, level: i32, is_last: bool) -> IteratorItem {
+    fn new(path: &Path, level: usize, is_last: bool) -> IteratorItem {
         
         let metadata = path.symlink_metadata().expect("symlink_metadata");
 
@@ -32,17 +32,17 @@ impl IteratorItem {
             path: path.to_owned(),
             metadata: metadata,
             level: level,
-            is_last_in_folder: is_last,
+            is_last: is_last,
         }
     }
 
-    fn is_dir(&self) -> bool {
+    pub fn is_dir(&self) -> bool {
         self.metadata.is_dir()
     }
 
     pub fn to_string(&self) -> String {
         // format!("{}", self.path.display())
-        format!("path={:60} level={} is_last={}", self.path.display(), self.level, self.is_last_in_folder)
+        format!("path={:60} level={} is_last={}", self.path.display(), self.level, self.is_last)
     }
 }
 
@@ -110,7 +110,7 @@ impl FileIterator {
             }).collect();
 
             if let Some(item) = entries.first_mut() {
-                item.is_last_in_folder = true;
+                item.is_last = true;
             }
 
             for item in entries {

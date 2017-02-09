@@ -26,25 +26,6 @@ mod dirsign {
     pub const BLANK: char = '\u{00A0}';
 }
 
-fn path_to_str(dir: &Path) -> &str {
-    dir.file_name()
-        .and_then(|x| x.to_str())
-        .or_else(|| dir.to_str())
-        .unwrap_or("")
-}
-
-fn order_dir_entry(a: &DirEntry, b: &DirEntry) -> Ordering {
-    a.file_name().cmp(&b.file_name())
-}
-
-fn get_sorted_dir_entries(path: &Path) -> io::Result<Vec<DirEntry>> {
-    fs::read_dir(path).map(|entries| {
-        let mut dir_entries: Vec<DirEntry> = entries.filter_map(Result::ok).collect();
-        dir_entries.sort_by(order_dir_entry);
-        dir_entries
-    })
-}
-
 fn set_line_prefix(levels: &Vec<bool>, prefix: &mut String) {
     let len = levels.len();
     let index = len.saturating_sub(1);
@@ -109,10 +90,6 @@ fn print_path(file_name: &str,
     }
 }
 
-fn is_hidden(file_name: &str) -> bool {
-    file_name.starts_with(".")
-}
-
 struct DirEntrySummary {
     num_folders: usize,
     num_files: usize,
@@ -124,11 +101,6 @@ impl DirEntrySummary {
             num_folders: 0,
             num_files: 0,
         }
-    }
-
-    fn add(&mut self, other: &DirEntrySummary) {
-        self.num_files += other.num_files;
-        self.num_folders += other.num_folders;
     }
 }
 
@@ -202,123 +174,50 @@ impl<'a> TreePrinter<'a> {
         }
     }
 
-    fn iterate_folders(&mut self, path: &Path) -> io::Result<DirEntrySummary> {
+    fn update_levels(&self, levels: &mut Vec<bool>, level: usize, is_last: bool)
+    {
+        while levels.len() > level {
+            levels.pop();
+        }
+
+        if level > levels.len() {
+            levels.push(!is_last);
+        }
+
+        let levels_len = levels.len();
+        if levels_len > 0 {
+            levels[levels_len.saturating_sub(1)] = !is_last;
+        }
+    }
+
+    fn iterate_folders2(&mut self, path: &Path) -> io::Result<DirEntrySummary> {
         let mut summary = DirEntrySummary::new();
-        let file_name = path_to_str(path);
-        if !self.config.show_hidden && self.levels.len() > 0 && is_hidden(file_name) {
-            return Ok(summary);
-        }
 
-        // store path metadata to avoid many syscalls
-        let path_metadata = path.symlink_metadata()?;
+        let config = pathiterator::FileIteratorConfig {
+            include_glob: self.config.include_glob.clone(),
+            max_level: self.config.max_level,
+            show_hidden: self.config.show_hidden,
+        };
 
-        let is_dir = path_metadata.is_dir();
+        let mut levels: Vec<bool> = Vec::new();
+        let mut prefix = String::new();
 
-        set_line_prefix(&self.levels, &mut self.prefix_buffer);
+        for entry in pathiterator::iterate(path, config) {
+            self.update_levels(&mut levels, entry.level, entry.is_last);
 
-        if self.levels.len() >= self.config.max_level {
-            return Ok(summary);
-        }
-
-        loop {
-            let should_pop_front = if let Some(last_cache) = self.cache.items.back() {
-                last_cache.levels.len() >= self.levels.len()
+            if entry.is_dir() {
+                summary.num_folders += 1;
             } else {
-                false
-            };
-
-            if should_pop_front {
-                self.cache.items.pop_back();
-            } else {
-                break;
-            }
-        }
-
-        if !is_dir {
-            let file_is_included = if let Some(ref include_glob) = self.config.include_glob {
-                include_glob.is_match(file_name)
-            } else {
-                true
-            };
-
-            if file_is_included {
-                while let Some(item) = self.cache.items.pop_front() {
-                    let mut prefix = String::new();
-                    set_line_prefix(&item.levels, &mut prefix);
-                    write!(self.term, "{}", &prefix)?;
-                    let file_name = path_to_str(&item.path);
-                    print_path(file_name, &item.metadata, self.term, &self.config)?;
-                    writeln!(self.term, "")?;
-                    // Do not count root folder in summary
-                    if item.levels.len() > 0 {
-                        summary.num_folders += 1;
-                    }
-                }
-
                 summary.num_files += 1;
-
-                if path_metadata.file_type().is_symlink() {
-                    if let Ok(link_path) = fs::read_link(path) {
-                        write!(self.term, "{}", &self.prefix_buffer)?;
-                        write_color(self.term, &self.config, color::BRIGHT_CYAN, file_name)?;
-                        write!(self.term, " -> ")?;
-                        let link_file_name = format!("{}", link_path.display());
-
-                        // BUG: Currently prints all symlinks as executable, since the
-                        // metadata is for the symlink itself. Need to find a way to get new
-                        // metadata from the symlink. path.metadata()? will sometimes return
-                        // Err, as may calling link_path.metadata()?;
-                        print_path(&link_file_name, &path_metadata, self.term, &self.config)?;
-                        writeln!(self.term, "")?;
-
-                        return Ok(summary);
-                    }
-                }
-
-                write!(self.term, "{}", &self.prefix_buffer)?;
-                print_path(file_name, &path_metadata, self.term, &self.config)?;
-                writeln!(self.term, "")?;
-            }
-        } else {
-            if self.config.include_glob.is_some() {
-                let item =
-                    TreePrinterCacheItem::new(path.to_owned(), path_metadata, self.levels.clone());
-                self.cache.items.push_back(item);
-            } else {
-                write!(self.term, "{}", &self.prefix_buffer)?;
-                print_path(file_name, &path_metadata, self.term, &self.config)?;
-                writeln!(self.term, "")?;
-
-                if self.levels.len() > 0 {
-                    summary.num_folders += 1;
-                }
             }
 
-            let dir_entries = get_sorted_dir_entries(path);
-            if let Err(err) = dir_entries {
-                let error_msg = format!("Could not read directory '{}': {}\n", path.display(), err);
-                write_color(self.term, &self.config, color::RED, &error_msg)?;
-                return Ok(summary);
-            }
-
-            let dir_entries = dir_entries.unwrap();
-
-            self.levels.push(true);
-            let len_entries = dir_entries.len();
-            for entry in dir_entries.iter().take(len_entries.saturating_sub(1)) {
-                let sub_summary = self.iterate_folders(&entry.path())?;
-                summary.add(&sub_summary);
-            }
-
-            self.levels.pop();
-            self.levels.push(false);
-            if let Some(entry) = dir_entries.last() {
-                let sub_summary = self.iterate_folders(&entry.path())?;
-                summary.add(&sub_summary);
-            }
-            self.levels.pop();
-
+            set_line_prefix(&levels, &mut prefix);
+            print!("{}", prefix);
+            print_path(&entry.file_name, &entry.metadata, self.term, &self.config)?;
+            println!("");
         }
+
+        summary.num_folders = summary.num_folders.saturating_sub(1);
 
         Ok(summary)
     }
@@ -366,8 +265,6 @@ fn main() {
         usize::max_value()
     };
 
-
-
     let config = Config {
         use_color: use_color,
         show_hidden: matches.is_present("a"),
@@ -381,27 +278,11 @@ fn main() {
 
     let path = Path::new(matches.value_of("DIR").unwrap_or("."));
 
-    let c = pathiterator::FileIteratorConfig {
-        show_hidden: matches.is_present("a"),
-        include_glob: if let Some(pattern) = matches.value_of("include_pattern") {
-            Some(Glob::new(pattern).expect("include_pattern is not valid").compile_matcher())
-        } else {
-            None
-        },
-        max_level: max_level,
-    };
-
-    let itr = pathiterator::iterate(&path, c);
-
-    for item in itr {
-        println!("{}", item.to_string());
-    }
-    return;
 
     let mut term = get_terminal_printer();
     let summary = {
         let mut p = TreePrinter::new(config, &mut term);
-        p.iterate_folders(&path).expect("Program failed")
+        p.iterate_folders2(&path).expect("Program failed")
     };
 
     writeln!(&mut term,
