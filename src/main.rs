@@ -2,6 +2,8 @@ extern crate term;
 extern crate clap;
 extern crate globset;
 
+mod pathiterator;
+
 use globset::{Glob, GlobMatcher};
 
 use term::color;
@@ -240,7 +242,6 @@ impl<'a> TreePrinter<'a> {
             };
 
             if file_is_included {
-                // TODO: Print all folders in cache
                 while let Some(item) = self.cache.items.pop_front() {
                     let mut prefix = String::new();
                     set_line_prefix(&item.levels, &mut prefix);
@@ -365,6 +366,8 @@ fn main() {
         usize::max_value()
     };
 
+
+
     let config = Config {
         use_color: use_color,
         show_hidden: matches.is_present("a"),
@@ -377,6 +380,23 @@ fn main() {
     };
 
     let path = Path::new(matches.value_of("DIR").unwrap_or("."));
+
+    let c = pathiterator::FileIteratorConfig {
+        show_hidden: matches.is_present("a"),
+        include_glob: if let Some(pattern) = matches.value_of("include_pattern") {
+            Some(Glob::new(pattern).expect("include_pattern is not valid").compile_matcher())
+        } else {
+            None
+        },
+        max_level: max_level,
+    };
+
+    let itr = pathiterator::iterate(&path, c);
+
+    for item in itr {
+        println!("{}", item.to_string());
+    }
+    return;
 
     let mut term = get_terminal_printer();
     let summary = {
