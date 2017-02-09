@@ -190,7 +190,7 @@ impl<'a> TreePrinter<'a> {
         }
     }
 
-    fn iterate_folders2(&mut self, path: &Path) -> io::Result<DirEntrySummary> {
+    fn iterate_folders(&mut self, path: &Path) -> io::Result<DirEntrySummary> {
         let mut summary = DirEntrySummary::new();
 
         let config = pathiterator::FileIteratorConfig {
@@ -212,14 +212,25 @@ impl<'a> TreePrinter<'a> {
             }
 
             set_line_prefix(&levels, &mut prefix);
-            print!("{}", prefix);
-            print_path(&entry.file_name, &entry.metadata, self.term, &self.config)?;
-            println!("");
+            self.print_line(&entry, &prefix);
         }
 
         summary.num_folders = summary.num_folders.saturating_sub(1);
 
         Ok(summary)
+    }
+
+    fn print_line(&mut self, entry: &pathiterator::IteratorItem, prefix: &str) -> io::Result<()> {
+        print!("{}", prefix);
+        if let Ok(ref metadata) = entry.metadata {
+            print_path(&entry.file_name, &metadata, self.term, &self.config)?;
+        } else {
+            print!("{} [Error]", entry.file_name);
+        }
+
+        println!("");
+
+        Ok(())
     }
 }
 
@@ -282,7 +293,7 @@ fn main() {
     let mut term = get_terminal_printer();
     let summary = {
         let mut p = TreePrinter::new(config, &mut term);
-        p.iterate_folders2(&path).expect("Program failed")
+        p.iterate_folders(&path).expect("Program failed")
     };
 
     writeln!(&mut term,

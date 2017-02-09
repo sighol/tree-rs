@@ -10,7 +10,7 @@ use std::collections::VecDeque;
 pub struct IteratorItem {
     pub file_name: String,
     pub path: PathBuf,
-    pub metadata: Metadata,
+    pub metadata: io::Result<Metadata>,
     pub level: usize,
     pub is_last: bool,
 }
@@ -25,7 +25,7 @@ pub fn path_to_str(path: &Path) -> &str {
 impl IteratorItem {
     fn new(path: &Path, level: usize, is_last: bool) -> IteratorItem {
         
-        let metadata = path.symlink_metadata().expect("symlink_metadata");
+        let metadata = path.symlink_metadata();
 
         IteratorItem {
             file_name: String::from(path_to_str(path)),
@@ -37,7 +37,11 @@ impl IteratorItem {
     }
 
     pub fn is_dir(&self) -> bool {
-        self.metadata.is_dir()
+        if let Ok(ref metadata) = self.metadata {
+            metadata.is_dir()
+        } else {
+            false
+        }
     }
 
     pub fn to_string(&self) -> String {
@@ -125,7 +129,7 @@ impl Iterator for FileIterator {
 
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(item) = self.queue.pop_back(){
-            if item.metadata.is_dir() {
+            if item.is_dir() {
                 self.push_dir(&item);
             }
 
