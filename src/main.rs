@@ -146,7 +146,7 @@ struct Config {
     use_color: bool,
     show_hidden: bool,
     max_level: usize,
-    include_regex: Option<GlobMatcher>,
+    include_glob: Option<GlobMatcher>,
 }
 
 type TerminalType = Box<term::StdoutTerminal>;
@@ -233,8 +233,8 @@ impl<'a> TreePrinter<'a> {
         }
 
         if !is_dir {
-            let file_is_included = if let Some(ref include_regex) = self.config.include_regex {
-                include_regex.is_match(file_name)
+            let file_is_included = if let Some(ref include_glob) = self.config.include_glob {
+                include_glob.is_match(file_name)
             } else {
                 true
             };
@@ -279,7 +279,7 @@ impl<'a> TreePrinter<'a> {
                 writeln!(self.term, "")?;
             }
         } else {
-            if self.config.include_regex.is_some() {
+            if self.config.include_glob.is_some() {
                 let item =
                     TreePrinterCacheItem::new(path.to_owned(), path_metadata, self.levels.clone());
                 self.cache.items.push_back(item);
@@ -348,13 +348,13 @@ fn main() {
         .arg(Arg::with_name("include_pattern")
             .short("P")
             .takes_value(true)
-            .help("List only those files that match the pattern given"))
+            .help("List only those files matching <include_pattern>"))
         .arg(Arg::with_name("level")
             .short("L")
             .long("level")
             .takes_value(true)
             .validator(|s| to_int(&s).map(|_| ()))
-            .help("Descend only level directories deep"))
+            .help("Descend only <level> directories deep"))
         .get_matches();
 
     let use_color = matches.is_present("color_on") || !matches.is_present("color_off");
@@ -368,7 +368,7 @@ fn main() {
     let config = Config {
         use_color: use_color,
         show_hidden: matches.is_present("a"),
-        include_regex: if let Some(pattern) = matches.value_of("include_pattern") {
+        include_glob: if let Some(pattern) = matches.value_of("include_pattern") {
             Some(Glob::new(pattern).expect("include_pattern is not valid").compile_matcher())
         } else {
             None
