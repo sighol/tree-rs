@@ -202,7 +202,7 @@ impl<'a> TreePrinter<'a> {
         let mut levels: Vec<bool> = Vec::new();
         let mut prefix = String::new();
 
-        for entry in pathiterator::iterate(path, config) {
+        for entry in pathiterator::FileIterator::new(path, config) {
             self.update_levels(&mut levels, entry.level, entry.is_last);
 
             if entry.is_dir() {
@@ -212,7 +212,7 @@ impl<'a> TreePrinter<'a> {
             }
 
             set_line_prefix(&levels, &mut prefix);
-            self.print_line(&entry, &prefix);
+            self.print_line(&entry, &prefix)?;
         }
 
         summary.num_folders = summary.num_folders.saturating_sub(1);
@@ -243,7 +243,7 @@ fn to_int(v: &str) -> Result<usize, String> {
 fn main() {
     let matches = App::new(env!("CARGO_PKG_NAME"))
         .version(env!("CARGO_PKG_VERSION"))
-        .arg(Arg::with_name("a")
+        .arg(Arg::with_name("show_all")
             .short("a")
             .long("all")
             .help("Show hidden files"))
@@ -278,7 +278,7 @@ fn main() {
 
     let config = Config {
         use_color: use_color,
-        show_hidden: matches.is_present("a"),
+        show_hidden: matches.is_present("show_all"),
         include_glob: if let Some(pattern) = matches.value_of("include_pattern") {
             Some(Glob::new(pattern).expect("include_pattern is not valid").compile_matcher())
         } else {
@@ -288,7 +288,6 @@ fn main() {
     };
 
     let path = Path::new(matches.value_of("DIR").unwrap_or("."));
-
 
     let mut term = get_terminal_printer();
     let summary = {

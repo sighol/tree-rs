@@ -43,19 +43,16 @@ impl IteratorItem {
             false
         }
     }
-
-    pub fn to_string(&self) -> String {
-        // format!("{}", self.path.display())
-        format!("path={:60} level={} is_last={}", self.path.display(), self.level, self.is_last)
-    }
 }
 
+#[derive(Debug)]
 pub struct FileIteratorConfig {
     pub show_hidden: bool,
     pub max_level: usize,
     pub include_glob: Option<GlobMatcher>,
 }
 
+#[derive(Debug)]
 pub struct FileIterator {
     queue: VecDeque<IteratorItem>,
     config: FileIteratorConfig,
@@ -74,7 +71,7 @@ fn get_sorted_dir_entries(path: &Path) -> io::Result<Vec<DirEntry>> {
 }
 
 impl FileIterator {
-    fn new(path: &Path, config: FileIteratorConfig) -> FileIterator {
+    pub fn new(path: &Path, config: FileIteratorConfig) -> FileIterator {
         let mut queue = VecDeque::new();
         queue.push_back(IteratorItem::new(path, 0, true));
         FileIterator {
@@ -138,8 +135,4 @@ impl Iterator for FileIterator {
             None
         }
     }
-}
-
-pub fn iterate(path: &Path, config: FileIteratorConfig) -> FileIterator {
-    FileIterator::new(path, config)
 }
