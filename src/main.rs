@@ -174,8 +174,7 @@ impl<'a> TreePrinter<'a> {
         }
     }
 
-    fn update_levels(&self, levels: &mut Vec<bool>, level: usize, is_last: bool)
-    {
+    fn update_levels(&self, levels: &mut Vec<bool>, level: usize, is_last: bool) {
         while levels.len() > level {
             levels.pop();
         }

@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use std::io;
 use std::cmp::Ordering;
 
-use globset::{GlobMatcher};
+use globset::GlobMatcher;
 use std::collections::VecDeque;
 
 #[derive(Debug)]
@@ -24,7 +24,7 @@ pub fn path_to_str(path: &Path) -> &str {
 
 impl IteratorItem {
     fn new(path: &Path, level: usize, is_last: bool) -> IteratorItem {
-        
+
         let metadata = path.symlink_metadata();
 
         IteratorItem {
@@ -105,10 +105,9 @@ impl FileIterator {
         if let Ok(entries) = entries {
 
             let mut entries: Vec<IteratorItem> = entries.iter()
-            .map(|e| IteratorItem::new(&e.path(), item.level + 1, false))
-            .filter(|item| {
-                self.is_included(&item.file_name, item.is_dir())
-            }).collect();
+                .map(|e| IteratorItem::new(&e.path(), item.level + 1, false))
+                .filter(|item| self.is_included(&item.file_name, item.is_dir()))
+                .collect();
 
             if let Some(item) = entries.first_mut() {
                 item.is_last = true;
@@ -125,7 +124,7 @@ impl Iterator for FileIterator {
     type Item = IteratorItem;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if let Some(item) = self.queue.pop_back(){
+        if let Some(item) = self.queue.pop_back() {
             if item.is_dir() {
                 self.push_dir(&item);
             }
