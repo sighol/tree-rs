@@ -89,14 +89,14 @@ impl FileIterator {
     }
 
     fn is_included(&self, name: &str, is_dir: bool) -> bool {
-        if !self.config.show_hidden && name.starts_with(".") {
+        if !self.config.show_hidden && name.starts_with('.') {
             return false;
         }
 
         if is_dir {
-            return true;
+            true
         } else {
-            self.is_glob_included(&name)
+            self.is_glob_included(name)
         }
     }
 

@@ -8,13 +8,9 @@ use globset::{Glob, GlobMatcher};
 
 use term::color;
 
-use std::collections::VecDeque;
-
-use std::fs::{self, DirEntry, Metadata};
-use std::path::{Path, PathBuf};
+use std::fs::Metadata;
+use std::path::Path;
 use std::io;
-
-use std::cmp::Ordering;
 
 use clap::{Arg, App};
 
@@ -26,7 +22,7 @@ mod dirsign {
     pub const BLANK: char = '\u{00A0}';
 }
 
-fn set_line_prefix(levels: &Vec<bool>, prefix: &mut String) {
+fn set_line_prefix(levels: &[bool], prefix: &mut String) {
     let len = levels.len();
     let index = len.saturating_sub(1);
 
@@ -77,7 +73,7 @@ fn write_color(t: &mut TerminalType,
 }
 
 fn print_path(file_name: &str,
-              metadata: &fs::Metadata,
+              metadata: &Metadata,
               t: &mut TerminalType,
               config: &Config)
               -> io::Result<()> {
@@ -105,12 +101,12 @@ impl DirEntrySummary {
 }
 
 #[cfg(not(target_os = "linux"))]
-fn is_executable(metadata: &fs::Metadata) -> bool {
+fn is_executable(metadata: &Metadata) -> bool {
     false
 }
 
 #[cfg(target_os = "linux")]
-fn is_executable(metadata: &fs::Metadata) -> bool {
+fn is_executable(metadata: &Metadata) -> bool {
     use std::os::unix::fs::PermissionsExt;
     let mode = metadata.permissions().mode();
     (mode & 0o100) != 0
@@ -129,38 +125,9 @@ fn get_terminal_printer() -> TerminalType {
     term::stdout().expect("Could not unwrap term::stdout.")
 }
 
-struct TreePrinterCacheItem {
-    metadata: Metadata,
-    levels: Vec<bool>,
-    path: PathBuf,
-}
-
-impl TreePrinterCacheItem {
-    fn new(path: PathBuf, metadata: Metadata, levels: Vec<bool>) -> TreePrinterCacheItem {
-        TreePrinterCacheItem {
-            path: path,
-            metadata: metadata,
-            levels: levels,
-        }
-    }
-}
-
-struct TreePrinterCache {
-    items: VecDeque<TreePrinterCacheItem>,
-}
-
-impl TreePrinterCache {
-    fn new() -> TreePrinterCache {
-        TreePrinterCache { items: VecDeque::new() }
-    }
-}
-
 struct TreePrinter<'a> {
     term: &'a mut TerminalType,
     config: Config,
-    prefix_buffer: String,
-    levels: Vec<bool>,
-    cache: TreePrinterCache,
 }
 
 impl<'a> TreePrinter<'a> {
@@ -168,9 +135,6 @@ impl<'a> TreePrinter<'a> {
         TreePrinter {
             config: config,
             term: term,
-            prefix_buffer: String::new(),
-            levels: Vec::new(),
-            cache: TreePrinterCache::new(),
         }
     }
 
@@ -222,7 +186,7 @@ impl<'a> TreePrinter<'a> {
     fn print_line(&mut self, entry: &pathiterator::IteratorItem, prefix: &str) -> io::Result<()> {
         print!("{}", prefix);
         if let Ok(ref metadata) = entry.metadata {
-            print_path(&entry.file_name, &metadata, self.term, &self.config)?;
+            print_path(&entry.file_name, metadata, self.term, &self.config)?;
         } else {
             print!("{} [Error]", entry.file_name);
         }
@@ -270,7 +234,7 @@ fn main() {
     let use_color = matches.is_present("color_on") || !matches.is_present("color_off");
 
     let max_level = if let Some(level) = matches.value_of("level") {
-        to_int(&level).expect("Should have validated that this value was int...")
+        to_int(level).expect("Should have validated that this value was int...")
     } else {
         usize::max_value()
     };
@@ -291,7 +255,7 @@ fn main() {
     let mut term = get_terminal_printer();
     let summary = {
         let mut p = TreePrinter::new(config, &mut term);
-        p.iterate_folders(&path).expect("Program failed")
+        p.iterate_folders(path).expect("Program failed")
     };
 
     writeln!(&mut term,
