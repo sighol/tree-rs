@@ -164,7 +164,8 @@ impl<'a> TreePrinter<'a> {
         let mut levels: Vec<bool> = Vec::new();
         let mut prefix = String::new();
 
-        let list = filter::filter(pathiterator::FileIterator::new(path, config));
+        let list = pathiterator::FileIterator::new(path, config);
+        let list = filter::filter(list);
 
         for entry in list {
             self.update_levels(&mut levels, entry.level, entry.is_last);

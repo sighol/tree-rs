@@ -6,20 +6,19 @@ pub fn filter(iterator: FileIterator) -> Vec<IteratorItem> {
     let mut items: Vec<IteratorItem> = Vec::new();
     let mut cache: VecDeque<IteratorItem> = VecDeque::new();
 
-    for mut item in iterator {
+    for item in iterator {
         let is_dir = item.is_dir();
-        if is_dir {
-            loop {
-                if let Some(last) = cache.pop_back() {
-                    if last.level < item.level
-                    {
-                        cache.push_back(last);
-                        break;
-                    }
-                } else {
+        loop {
+            if let Some(last) = cache.pop_back() {
+                if last.level < item.level {
+                    cache.push_back(last);
                     break;
                 }
+            } else {
+                break;
             }
+        }
+        if is_dir {
             cache.push_back(item);
         } else {
             while let Some(cache_item) = cache.pop_front() {
@@ -31,5 +30,5 @@ pub fn filter(iterator: FileIterator) -> Vec<IteratorItem> {
         }
     }
 
-    items    
+    items
 }
