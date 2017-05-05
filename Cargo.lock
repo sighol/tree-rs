@@ -1,6 +1,6 @@
 [root]
 name = "tree-rs"
-version = "0.5.1"
+version = "0.6.0"
 dependencies = [
  "clap 2.20.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "globset 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)",

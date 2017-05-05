@@ -14,9 +14,13 @@ The goal is to be compatible with its command line arguments.
     ├── Cargo.toml
     ├── README.md
     ├── src
-    │   └── main.rs
-    └── test
-        └── file
+    │   ├── filter.rs
+    │   ├── main.rs
+    │   └── pathiterator.rs
+    └── timer.py
+
+    1 directories, 7 files
+
 
 ## Installation
 
@@ -34,5 +38,5 @@ cargo install
 ## Performance
 
 On linux it is a bit faster than the `tree` command.
-Based on a simple benchmark (see `timer.py`), it is about 20% faster.
+Based on a simple benchmark (see `timer.py`), it is about 10% faster.
 

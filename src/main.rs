@@ -270,19 +270,5 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
-    use std::path::Path;
-    use super::*;
 
-    #[test]
-    fn test_is_hidden() {
-        assert!(true == is_hidden(".git"));
-        assert!(false == is_hidden("file"));
-    }
-
-    #[test]
-    fn path_is_file_is_dir() {
-        let path = Path::new(".");
-        assert!(path.is_file() == false);
-        assert!(path.is_dir() == true);
-    }
 }
