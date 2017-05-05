@@ -32,6 +32,7 @@ cargo install tree-rs
 From github
 ```
 git clone https://github.com/sighol/tree-rs
+cd tree-rs
 cargo install
 ```
 
