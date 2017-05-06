@@ -165,7 +165,7 @@ impl<'a> TreePrinter<'a> {
         let mut prefix = String::new();
 
         let list = pathiterator::FileIterator::new(path, config);
-        let list = filter::filter(list);
+        let list = filter::FilteredIterator::new(list);
 
         for entry in list {
             self.update_levels(&mut levels, entry.level, entry.is_last);

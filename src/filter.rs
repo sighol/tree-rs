@@ -2,33 +2,57 @@ use std::collections::VecDeque;
 
 use pathiterator::{IteratorItem, FileIterator};
 
-pub fn filter(iterator: FileIterator) -> Vec<IteratorItem> {
-    let mut items: Vec<IteratorItem> = Vec::new();
-    let mut cache: VecDeque<IteratorItem> = VecDeque::new();
+pub struct FilteredIterator {
+    pub source: FileIterator,
+    cache: VecDeque<IteratorItem>,
+}
 
-    for item in iterator {
-        let is_dir = item.is_dir();
+impl FilteredIterator {
+    pub fn new(iterator: FileIterator) -> Self {
+        FilteredIterator {
+            source: iterator,
+            cache: VecDeque::new(),
+        }
+    }
+
+    /// Remove previous directories from cache that shouldn't be
+    /// shown because they are empty.
+    fn remove_empty_directories_from_cache(&mut self, item: &IteratorItem) {
         loop {
-            if let Some(last) = cache.pop_back() {
+            if let Some(last) = self.cache.pop_back() {
                 if last.level < item.level {
-                    cache.push_back(last);
+                    self.cache.push_back(last);
                     break;
                 }
             } else {
                 break;
             }
         }
-        if is_dir {
-            cache.push_back(item);
-        } else {
-            while let Some(cache_item) = cache.pop_front() {
-                items.push(cache_item);
-            }
-
-            cache.clear();
-            items.push(item);
-        }
     }
+}
 
-    items
+impl Iterator for FilteredIterator {
+    type Item = IteratorItem;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some(cache_item) = self.cache.pop_front() {
+            return Some(cache_item)
+        }
+
+        loop {
+            if let Some(item) = self.source.next() {
+                self.remove_empty_directories_from_cache(&item);
+                
+                if item.is_dir() {
+                    self.cache.push_back(item)
+                } else {
+                    return Some(item)
+                }
+            } else {
+                break;
+            }
+        }
+
+        None
+    }
 }
