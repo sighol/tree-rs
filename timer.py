@@ -50,4 +50,14 @@ tree = test("tree")
 
 print("")
 print("Perf tree-rs/tree:", tree_rs["avg"]/tree["avg"])
+
+
+tree_rs_filter = test("target/release/tree-rs -P '*.go'")
+tree_filter = test("tree -P '*.go'")
+
+print("")
+print("Perf tree-rs/tree:", tree_rs_filter["avg"]/tree_filter["avg"])
+
+
+
 print("Benchmarking finished in ", time() - start_time)
