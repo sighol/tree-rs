@@ -152,22 +152,29 @@ impl<'a> TreePrinter<'a> {
         }
     }
 
-    fn iterate_folders(&mut self, path: &Path) -> io::Result<DirEntrySummary> {
-        let mut summary = DirEntrySummary::new();
-
+    fn get_iterator(&self, path: &Path) -> filter::FilteredIterator {
         let config = pathiterator::FileIteratorConfig {
             include_glob: self.config.include_glob.clone(),
             max_level: self.config.max_level,
             show_hidden: self.config.show_hidden,
         };
 
+        let list = pathiterator::FileIterator::new(path, config);
+        let mut list = filter::FilteredIterator::new(list);
+        if self.config.include_glob.is_none() {
+            list.skip_filter();
+        }
+
+        list
+    }
+
+    fn iterate_folders(&mut self, path: &Path) -> io::Result<DirEntrySummary> {
+        let mut summary = DirEntrySummary::new();
+
         let mut levels: Vec<bool> = Vec::new();
         let mut prefix = String::new();
 
-        let list = pathiterator::FileIterator::new(path, config);
-        let list = filter::FilteredIterator::new(list);
-
-        for entry in list {
+        for entry in self.get_iterator(path) {
             self.update_levels(&mut levels, entry.level, entry.is_last);
 
             if entry.is_dir() {
