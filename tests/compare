@@ -1,0 +1,10 @@
+cd ..
+
+cargo run --  -n -P "*" > tree-rs-output
+
+tree -n > tree-output
+
+kdiff3 tree-output tree-rs-output
+
+rm tree-output
+rm tree-rs-output
