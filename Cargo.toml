@@ -1,10 +1,10 @@
 [package]
 name = "tree-rs"
-version = "0.6.3"
+version = "0.6.4"
 authors = ["Sigurd Holsen <sighol@gmail.com>"]
 description = """
-tree-rs is a cross platform incomplete reimplementation of the linux *tree*
-command. It supports colored output and specifying number of directory levels it
+tree-rs is a cross platform reimplementation of the linux *tree* command.
+It supports colored output and specifying the number of directory levels it
 should search.
 """
 license = "Unlicense/MIT"
