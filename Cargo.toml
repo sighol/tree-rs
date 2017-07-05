@@ -14,6 +14,6 @@ repository = "https://github.com/sighol/tree-rs"
 
 
 [dependencies]
-clap = "~2.20"
+clap = "~2.25"
 term = "0.4.*"
-globset = "0.1.3"
+globset = "0.2.*"
