@@ -125,7 +125,7 @@ impl Iterator for FileIterator {
 
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(item) = self.queue.pop_back() {
-            if item.is_dir() {
+            if item.is_dir() && item.level < self.config.max_level {
                 self.push_dir(&item);
             }
 
