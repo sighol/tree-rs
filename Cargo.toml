@@ -7,7 +7,7 @@ tree-rs is a cross platform reimplementation of the linux *tree* command.
 It supports colored output and specifying the number of directory levels it
 should search.
 """
-license = "Unlicense/MIT"
+license = "MIT"
 readme = "README.md"
 categories = ["command-line-utilities"]
 repository = "https://github.com/sighol/tree-rs"
