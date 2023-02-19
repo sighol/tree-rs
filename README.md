@@ -2,8 +2,7 @@
 
 # Tree-rs
 
-Tree-rs tries to create a cross-platform alternative to the unix `tree` command.
-The goal is to be compatible with its command line arguments.
+Cross-platform alternative to the unix `tree` command.
 
 `tree-rs` has been tested on Linux and Windows 7.
 
@@ -21,23 +20,10 @@ The goal is to be compatible with its command line arguments.
 
     1 directories, 7 files
 
-
 ## Installation
 
-From crates.io
-```
+```bash
 cargo install tree-rs
+# or
+cargo install --git https://github.com/sighol/tree-rs
 ```
-
-From github
-```
-git clone https://github.com/sighol/tree-rs
-cd tree-rs
-cargo install
-```
-
-## Performance
-
-On linux it is a bit faster than the `tree` command.
-Based on a simple benchmark (see `timer.py`), it is about 10% faster.
-
