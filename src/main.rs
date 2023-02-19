@@ -286,6 +286,7 @@ fn main() {
 #[cfg(test)]
 mod tests {
 
+    use std::fs::create_dir_all;
     use std::process::Command;
 
     const PATH: &'static str = "target/release/tree-rs";
@@ -302,6 +303,7 @@ mod tests {
 
     #[test]
     fn test_normal() {
+        create_dir_all("tests/simple/yyy/k").unwrap();
         let expected = r#"simple
 └── yyy
     ├── k
@@ -314,7 +316,7 @@ mod tests {
             └── b
                 └── c
 
-8 directories, 2 files
+6 directories, 4 files
 "#;
 
         let output = run_cmd(&["-n", "tests/simple"]);
@@ -323,6 +325,7 @@ mod tests {
 
     #[test]
     fn test_max_depth() {
+        create_dir_all("tests/simple/yyy/k").unwrap();
         let expected = r#"simple
 └── yyy
     ├── k
