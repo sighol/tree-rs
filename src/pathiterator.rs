@@ -62,11 +62,10 @@ fn order_dir_entry(a: &DirEntry, b: &DirEntry) -> Ordering {
 }
 
 fn get_sorted_dir_entries(path: &Path) -> io::Result<Vec<DirEntry>> {
-    fs::read_dir(path).map(|entries| {
-        let mut dir_entries: Vec<DirEntry> = entries.filter_map(Result::ok).collect();
-        dir_entries.sort_by(order_dir_entry);
-        dir_entries
-    })
+    let entries = fs::read_dir(path)?;
+    let mut dir_entries: Vec<DirEntry> = entries.into_iter().collect::<io::Result<Vec<_>>>()?;
+    dir_entries.sort_by(order_dir_entry);
+    Ok(dir_entries)
 }
 
 impl FileIterator {
@@ -97,21 +96,23 @@ impl FileIterator {
     }
 
     fn push_dir(&mut self, item: &IteratorItem) {
-        let entries = get_sorted_dir_entries(&item.path);
-        if let Ok(entries) = entries {
-            let mut entries: Vec<IteratorItem> = entries
-                .iter()
-                .map(|e| IteratorItem::new(&e.path(), item.level + 1, false))
-                .filter(|item| self.is_included(&item.file_name, item.is_dir()))
-                .collect();
+        let entries = get_sorted_dir_entries(&item.path).expect(&format!(
+            "Couldn't retrieve files in directory: {}",
+            item.path.display()
+        ));
 
-            if let Some(item) = entries.first_mut() {
-                item.is_last = true;
-            }
+        let mut entries: Vec<IteratorItem> = entries
+            .iter()
+            .map(|e| IteratorItem::new(&e.path(), item.level + 1, false))
+            .filter(|item| self.is_included(&item.file_name, item.is_dir()))
+            .collect();
 
-            for item in entries {
-                self.queue.push_back(item);
-            }
+        if let Some(item) = entries.first_mut() {
+            item.is_last = true;
+        }
+
+        for item in entries {
+            self.queue.push_back(item);
         }
     }
 }
