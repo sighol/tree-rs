@@ -1,7 +1,7 @@
-use std::fs::{self, DirEntry, Metadata};
-use std::path::{Path, PathBuf};
-use std::io;
 use std::cmp::Ordering;
+use std::fs::{self, DirEntry, Metadata};
+use std::io;
+use std::path::{Path, PathBuf};
 
 use globset::GlobMatcher;
 use std::collections::VecDeque;
@@ -24,15 +24,14 @@ pub fn path_to_str(path: &Path) -> &str {
 
 impl IteratorItem {
     fn new(path: &Path, level: usize, is_last: bool) -> IteratorItem {
-
         let metadata = path.symlink_metadata();
 
         IteratorItem {
             file_name: String::from(path_to_str(path)),
             path: path.to_owned(),
-            metadata: metadata,
-            level: level,
-            is_last: is_last,
+            metadata,
+            level,
+            is_last,
         }
     }
 
@@ -74,10 +73,7 @@ impl FileIterator {
     pub fn new(path: &Path, config: FileIteratorConfig) -> FileIterator {
         let mut queue = VecDeque::new();
         queue.push_back(IteratorItem::new(path, 0, true));
-        FileIterator {
-            queue: queue,
-            config: config,
-        }
+        FileIterator { queue, config }
     }
 
     fn is_glob_included(&self, file_name: &str) -> bool {
@@ -103,8 +99,8 @@ impl FileIterator {
     fn push_dir(&mut self, item: &IteratorItem) {
         let entries = get_sorted_dir_entries(&item.path);
         if let Ok(entries) = entries {
-
-            let mut entries: Vec<IteratorItem> = entries.iter()
+            let mut entries: Vec<IteratorItem> = entries
+                .iter()
                 .map(|e| IteratorItem::new(&e.path(), item.level + 1, false))
                 .filter(|item| self.is_included(&item.file_name, item.is_dir()))
                 .collect();

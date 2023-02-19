@@ -1,17 +1,14 @@
-extern crate term;
-extern crate clap;
-extern crate globset;
+use clap::{App, Arg};
 
 use std::fs::Metadata;
-use std::path::Path;
 use std::io;
+use std::path::Path;
 
 use globset::{Glob, GlobMatcher};
 use term::color;
-use clap::{Arg, App};
 
-mod pathiterator;
 mod filter;
+mod pathiterator;
 
 mod dirsign {
     pub const HORZ: char = '─';
@@ -53,11 +50,12 @@ fn set_line_prefix(levels: &[bool], prefix: &mut String) {
     }
 }
 
-fn write_color(t: &mut TerminalType,
-               config: &Config,
-               color: color::Color,
-               str: &str)
-               -> io::Result<()> {
+fn write_color(
+    t: &mut TerminalType,
+    config: &Config,
+    color: color::Color,
+    str: &str,
+) -> io::Result<()> {
     if config.use_color {
         t.fg(color)?;
     }
@@ -71,11 +69,12 @@ fn write_color(t: &mut TerminalType,
     Ok(())
 }
 
-fn print_path(file_name: &str,
-              metadata: &Metadata,
-              t: &mut TerminalType,
-              config: &Config)
-              -> io::Result<()> {
+fn print_path(
+    file_name: &str,
+    metadata: &Metadata,
+    t: &mut TerminalType,
+    config: &Config,
+) -> io::Result<()> {
     if metadata.is_dir() {
         write_color(t, config, color::BRIGHT_BLUE, file_name)
     } else if is_executable(metadata) {
@@ -131,10 +130,7 @@ struct TreePrinter<'a> {
 
 impl<'a> TreePrinter<'a> {
     fn new(config: Config, term: &'a mut TerminalType) -> TreePrinter<'a> {
-        TreePrinter {
-            config: config,
-            term: term,
-        }
+        TreePrinter { config, term }
     }
 
     fn update_levels(&self, levels: &mut Vec<bool>, level: usize, is_last: bool) {
@@ -200,7 +196,7 @@ impl<'a> TreePrinter<'a> {
             print!("{} [Error]", entry.file_name);
         }
 
-        println!("");
+        println!();
 
         Ok(())
     }
@@ -215,29 +211,41 @@ fn to_int(v: &str) -> Result<usize, String> {
 fn main() {
     let matches = App::new(env!("CARGO_PKG_NAME"))
         .version(env!("CARGO_PKG_VERSION"))
-        .arg(Arg::with_name("show_all")
-            .short("a")
-            .long("all")
-            .help("Show hidden files"))
-        .arg(Arg::with_name("color_on")
-            .short("C")
-            .help("Turn colorization on always"))
-        .arg(Arg::with_name("color_off")
-            .short("n")
-            .help("Turn colorization off always"))
-        .arg(Arg::with_name("DIR")
-            .index(1)
-            .help("Directory you want to search"))
-        .arg(Arg::with_name("include_pattern")
-            .short("P")
-            .takes_value(true)
-            .help("List only those files matching <include_pattern>"))
-        .arg(Arg::with_name("level")
-            .short("L")
-            .long("level")
-            .takes_value(true)
-            .validator(|s| to_int(&s).map(|_| ()))
-            .help("Descend only <level> directories deep"))
+        .arg(
+            Arg::with_name("show_all")
+                .short("a")
+                .long("all")
+                .help("Show hidden files"),
+        )
+        .arg(
+            Arg::with_name("color_on")
+                .short("C")
+                .help("Turn colorization on always"),
+        )
+        .arg(
+            Arg::with_name("color_off")
+                .short("n")
+                .help("Turn colorization off always"),
+        )
+        .arg(
+            Arg::with_name("DIR")
+                .index(1)
+                .help("Directory you want to search"),
+        )
+        .arg(
+            Arg::with_name("include_pattern")
+                .short("P")
+                .takes_value(true)
+                .help("List only those files matching <include_pattern>"),
+        )
+        .arg(
+            Arg::with_name("level")
+                .short("L")
+                .long("level")
+                .takes_value(true)
+                .validator(|s| to_int(&s).map(|_| ()))
+                .help("Descend only <level> directories deep"),
+        )
         .get_matches();
 
     let use_color = matches.is_present("color_on") || !matches.is_present("color_off");
@@ -249,14 +257,14 @@ fn main() {
     };
 
     let config = Config {
-        use_color: use_color,
+        use_color,
         show_hidden: matches.is_present("show_all"),
-        include_glob: if let Some(pattern) = matches.value_of("include_pattern") {
-            Some(Glob::new(pattern).expect("include_pattern is not valid").compile_matcher())
-        } else {
-            None
-        },
-        max_level: max_level,
+        include_glob: matches.value_of("include_pattern").map(|pattern| {
+            Glob::new(pattern)
+                .expect("include_pattern is not valid")
+                .compile_matcher()
+        }),
+        max_level,
     };
 
     let path = Path::new(matches.value_of("DIR").unwrap_or("."));
@@ -267,13 +275,13 @@ fn main() {
         p.iterate_folders(path).expect("Program failed")
     };
 
-    writeln!(&mut term,
-             "\n{} directories, {} files",
-             summary.num_folders,
-             summary.num_files)
-        .expect("Failed to print summary");
+    writeln!(
+        &mut term,
+        "\n{} directories, {} files",
+        summary.num_folders, summary.num_files
+    )
+    .expect("Failed to print summary");
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -330,8 +338,7 @@ mod tests {
     }
 
     #[test]
-    fn test_filter_txt_files()
-    {
+    fn test_filter_txt_files() {
         let expected = r#"simple
 └── yyy
     ├── test.txt
