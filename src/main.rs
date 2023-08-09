@@ -1,4 +1,5 @@
-use clap::{Arg, ArgAction, Command};
+use clap::ArgAction;
+use clap::Parser;
 
 use std::io;
 use std::path::Path;
@@ -202,65 +203,44 @@ impl<'a> TreePrinter<'a> {
     }
 }
 
-fn to_int(v: &str) -> Result<usize, String> {
-    use std::str::FromStr;
+#[derive(Parser, Debug)]
+#[command(author, version, about)]
+struct Cli {
+    #[arg(short, long, help = "Show hidden files")]
+    show_all: bool,
 
-    FromStr::from_str(v).map_err(|e| format!("Could not parse '{}' as an integer: {}", &v, e))
+    #[arg(short = 'C', help = "Turn colorization on always")]
+    color_on: bool,
+
+    #[arg(short='n', help="Turn colorization off always", action=ArgAction::SetTrue)]
+    color_off: Option<bool>,
+
+    #[arg(help = "Directory you want to search", default_value = ".")]
+    dir: Option<PathBuf>,
+
+    #[arg(short = 'P', help = "List only those files matching INCLUDE_PATTERN>")]
+    include_pattern: Option<String>,
+
+    #[arg(short, long, help = "Descend only LEVEL directories deep")]
+    level: Option<usize>,
+}
+
+impl Cli {
+    fn use_color(&self) -> bool {
+        self.color_on || !self.color_off.is_some_and(|x| x)
+    }
 }
 
 fn main() {
-    let matches = Command::new(env!("CARGO_PKG_NAME"))
-        .version(env!("CARGO_PKG_VERSION"))
-        .arg(
-            Arg::new("show_all")
-                .short('a')
-                .long("all")
-                .action(ArgAction::SetTrue)
-                .help("Show hidden files"),
-        )
-        .arg(
-            Arg::new("color_on")
-                .short('C')
-                .action(ArgAction::SetTrue)
-                .help("Turn colorization on always"),
-        )
-        .arg(
-            Arg::new("color_off")
-                .short('n')
-                .action(ArgAction::SetTrue)
-                .help("Turn colorization off always"),
-        )
-        .arg(
-            Arg::new("DIR")
-                .index(1)
-                .help("Directory you want to search"),
-        )
-        .arg(
-            Arg::new("include_pattern")
-                .short('P')
-                .help("List only those files matching <include_pattern>"),
-        )
-        .arg(
-            Arg::new("level")
-                .short('L')
-                .long("level")
-                .value_parser(to_int)
-                .help("Descend only <level> directories deep"),
-        )
-        .get_matches();
+    let cli = Cli::parse();
+    println!("cli: {cli:#?}");
 
-    let use_color = matches.contains_id("color_on") || !matches.contains_id("color_off");
-
-    let max_level = if let Some(level) = matches.get_one::<String>("level") {
-        to_int(&level).expect("Should have validated that this value was int...")
-    } else {
-        usize::max_value()
-    };
+    let max_level = cli.level.unwrap_or(usize::max_value());
 
     let config = Config {
-        use_color,
-        show_hidden: matches.contains_id("show_all"),
-        include_glob: matches.get_one::<String>("include_pattern").map(|pattern| {
+        use_color: cli.use_color(),
+        show_hidden: cli.show_all,
+        include_glob: cli.include_pattern.map(|pattern| {
             Glob::new(&pattern)
                 .expect("include_pattern is not valid")
                 .compile_matcher()
@@ -268,15 +248,12 @@ fn main() {
         max_level,
     };
 
-    let path = matches
-        .get_one::<String>("DIR")
-        .map(|p| -> &Path { Path::new(&*p) })
-        .unwrap_or_else(|| Path::new("."));
+    let path = cli.dir.unwrap_or(PathBuf::from("."));
 
     let mut term = get_terminal_printer();
     let summary = {
         let mut p = TreePrinter::new(config, &mut term);
-        p.iterate_folders(path).expect("Program failed")
+        p.iterate_folders(&path).expect("Program failed")
     };
 
     writeln!(
