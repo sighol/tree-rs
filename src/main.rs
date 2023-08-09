@@ -1,4 +1,4 @@
-use clap::{Arg, ArgAction, Command};
+use clap::Parser;
 
 use std::fs::Metadata;
 use std::io;
@@ -202,76 +202,52 @@ impl<'a> TreePrinter<'a> {
     }
 }
 
-fn to_int(v: &str) -> Result<usize, String> {
-    use std::str::FromStr;
-
-    FromStr::from_str(v).map_err(|e| format!("Could not parse '{}' as an integer: {}", &v, e))
+#[derive(Debug, Parser)]
+struct Args {
+    /// Show hidden files
+    #[clap(short = 'a', long = "all")]
+    show_all: bool,
+    /// Turn colorization on always
+    #[clap(short = 'C')]
+    color_on: bool,
+    /// Turn colorization off always
+    #[clap(short = 'n')]
+    color_off: bool,
+    /// Directory you want to search
+    #[clap(value_name = "DIR", default_value = ".")]
+    dir: String,
+    /// List only those files matching <include_pattern>
+    #[clap(short = 'P')]
+    include_pattern: Option<String>,
+    /// Descend only <level> directories deep
+    #[clap(short = 'L', long = "level", default_value_t = usize::max_value())]
+    max_level: usize,
 }
 
 fn main() {
-    let matches = Command::new(env!("CARGO_PKG_NAME"))
-        .version(env!("CARGO_PKG_VERSION"))
-        .arg(
-            Arg::new("show_all")
-                .short('a')
-                .long("all")
-                .action(ArgAction::SetTrue)
-                .help("Show hidden files"),
-        )
-        .arg(
-            Arg::new("color_on")
-                .short('C')
-                .action(ArgAction::SetTrue)
-                .help("Turn colorization on always"),
-        )
-        .arg(
-            Arg::new("color_off")
-                .short('n')
-                .action(ArgAction::SetTrue)
-                .help("Turn colorization off always"),
-        )
-        .arg(
-            Arg::new("DIR")
-                .index(1)
-                .help("Directory you want to search"),
-        )
-        .arg(
-            Arg::new("include_pattern")
-                .short('P')
-                .help("List only those files matching <include_pattern>"),
-        )
-        .arg(
-            Arg::new("level")
-                .short('L')
-                .long("level")
-                .value_parser(to_int)
-                .help("Descend only <level> directories deep"),
-        )
-        .get_matches();
+    let Args {
+        show_all,
+        color_on,
+        color_off,
+        dir,
+        include_pattern,
+        max_level,
+    } = Args::parse();
 
-    let use_color = matches.get_flag("color_on") || !matches.get_flag("color_off");
-
-    let max_level = if let Some(level) = matches.get_one::<String>("level") {
-        to_int(&level).expect("Should have validated that this value was int...")
-    } else {
-        usize::max_value()
-    };
+    let use_color = color_on || !color_off;
 
     let config = Config {
         use_color,
-        show_hidden: matches.get_flag("show_all"),
-        include_glob: matches.get_one::<String>("include_pattern").map(|pattern| {
-            Glob::new(&pattern)
+        show_hidden: show_all,
+        include_glob: include_pattern.as_deref().map(|pat| {
+            Glob::new(pat)
                 .expect("include_pattern is not valid")
                 .compile_matcher()
         }),
         max_level,
     };
 
-    let path = matches
-        .get_one::<String>("DIR")
-        .map(|p| -> &Path { Path::new(&*p) })
-        .unwrap_or_else(|| Path::new("."));
+    let path = Path::new(&dir);
 
     let mut term = get_terminal_printer();
     let summary = {
