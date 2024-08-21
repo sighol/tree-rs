@@ -55,16 +55,15 @@ impl Iterator for FilteredIterator {
             self.remove_empty_directories_from_cache(&item);
 
             if item.is_dir() {
-                self.cache.push_back(item)
+                self.cache.push_back(item);
             } else {
                 // If the cache already contains a folder, start emptying cache, and
                 // save the item.
                 if let Some(cache_front) = self.cache.pop_front() {
                     self.next_item = Some(item);
                     return Some(cache_front);
-                } else {
-                    return Some(item);
                 }
+                return Some(item);
             }
         }
 

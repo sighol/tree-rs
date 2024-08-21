@@ -1,8 +1,11 @@
+#![deny(clippy::pedantic)]
+#![deny(clippy::all)]
+
 use clap::Parser;
 
-use std::fs::Metadata;
 use std::io;
 use std::path::Path;
+use std::{error::Error, fs::Metadata};
 
 use globset::{Glob, GlobMatcher};
 use term::color;
@@ -18,12 +21,15 @@ mod dirsign {
     pub const BLANK: char = '\u{00A0}';
 }
 
+/// Calculates the indent level in a tree and prints
+/// the correct sign to indicate the hierarchy
 fn set_line_prefix(levels: &[bool], prefix: &mut String) {
     let len = levels.len();
     let index = len.saturating_sub(1);
 
     prefix.clear();
-    for level in levels.iter().take(index) {
+
+    levels.iter().take(index).for_each(|level| {
         if *level {
             prefix.push(dirsign::VERT);
             prefix.push(dirsign::BLANK);
@@ -35,7 +41,7 @@ fn set_line_prefix(levels: &[bool], prefix: &mut String) {
         }
 
         prefix.push(' ');
-    }
+    });
 
     if let Some(last) = levels.last() {
         if *last {
@@ -60,7 +66,7 @@ fn write_color(
         t.fg(color)?;
     }
 
-    write!(t, "{}", str)?;
+    write!(t, "{str}")?;
 
     if config.use_color {
         t.reset()?;
@@ -80,7 +86,7 @@ fn print_path(
     } else if is_executable(metadata) {
         write_color(t, config, color::BRIGHT_GREEN, file_name)
     } else {
-        write!(t, "{}", file_name)
+        write!(t, "{file_name}")
     }
 }
 
@@ -117,10 +123,31 @@ struct Config {
     include_glob: Option<GlobMatcher>,
 }
 
+impl TryFrom<&Args> for Config {
+    type Error = String;
+
+    fn try_from(value: &Args) -> Result<Self, Self::Error> {
+        let include_glob = value
+            .include_pattern
+            .as_deref()
+            .map(Glob::new)
+            .transpose()
+            .map_err(|e| format!("`include_pattern` is not valid: {e}"))?
+            .map(|glob| glob.compile_matcher());
+
+        Ok(Config {
+            use_color: value.color_on || !value.color_off,
+            show_hidden: value.show_all,
+            max_level: value.max_level,
+            include_glob,
+        })
+    }
+}
+
 type TerminalType = Box<term::StdoutTerminal>;
 
-fn get_terminal_printer() -> TerminalType {
-    term::stdout().expect("Could not unwrap term::stdout.")
+fn get_terminal_printer() -> Result<TerminalType, Box<dyn Error>> {
+    Ok(term::stdout().ok_or("Could not unwrap `term::stdout`.")?)
 }
 
 struct TreePrinter<'a> {
@@ -130,10 +157,10 @@ struct TreePrinter<'a> {
 
 impl<'a> TreePrinter<'a> {
     fn new(config: Config, term: &'a mut TerminalType) -> TreePrinter<'a> {
-        TreePrinter { config, term }
+        TreePrinter { term, config }
     }
 
-    fn update_levels(&self, levels: &mut Vec<bool>, level: usize, is_last: bool) {
+    fn update_levels(levels: &mut Vec<bool>, level: usize, is_last: bool) {
         while levels.len() > level {
             levels.pop();
         }
@@ -171,7 +198,7 @@ impl<'a> TreePrinter<'a> {
         let mut prefix = String::new();
 
         for entry in self.get_iterator(path) {
-            self.update_levels(&mut levels, entry.level, entry.is_last);
+            Self::update_levels(&mut levels, entry.level, entry.is_last);
 
             if entry.is_dir() {
                 summary.num_folders += 1;
@@ -189,11 +216,11 @@ impl<'a> TreePrinter<'a> {
     }
 
     fn print_line(&mut self, entry: &pathiterator::IteratorItem, prefix: &str) -> io::Result<()> {
-        print!("{}", prefix);
+        print!("{prefix}");
         if let Ok(ref metadata) = entry.metadata {
             print_path(&entry.file_name, metadata, self.term, &self.config)?;
         } else {
-            print!("{} [Error]", entry.file_name);
+            eprint!("{} [Error]", entry.file_name);
         }
 
         println!();
@@ -216,7 +243,7 @@ struct Args {
     /// Directory you want to search
     #[clap(value_name = "DIR", default_value = ".")]
     dir: String,
-    /// List only those files matching <include_pattern>
+    /// List only those files matching <`include_pattern`>
     #[clap(short = 'P')]
     include_pattern: Option<String>,
     /// Descend only <level> directories deep
@@ -224,35 +251,17 @@ struct Args {
     max_level: usize,
 }
 
-fn main() {
-    let Args {
-        show_all,
-        color_on,
-        color_off,
-        dir,
-        include_pattern,
-        max_level,
-    } = Args::parse();
+fn main() -> Result<(), Box<dyn Error>> {
+    let args = Args::parse();
+    let config = Config::try_from(&args)?;
 
-    let use_color = color_on || !color_off;
+    let path = Path::new(args.dir.as_str());
 
-    let config = Config {
-        use_color,
-        show_hidden: show_all,
-        include_glob: include_pattern.as_deref().map(|pat| {
-            Glob::new(pat)
-                .expect("include_pattern is not valid")
-                .compile_matcher()
-        }),
-        max_level,
-    };
-
-    let path = Path::new(&dir);
-
-    let mut term = get_terminal_printer();
+    let mut term = get_terminal_printer()?;
     let summary = {
         let mut p = TreePrinter::new(config, &mut term);
-        p.iterate_folders(path).expect("Program failed")
+        p.iterate_folders(path)
+            .map_err(|e| format!("Program failed with error: {e}"))?
     };
 
     writeln!(
@@ -260,7 +269,9 @@ fn main() {
         "\n{} directories, {} files",
         summary.num_folders, summary.num_files
     )
-    .expect("Failed to print summary");
+    .map_err(|e| format!("Failed to print summary: {e}"))?;
+
+    Ok(())
 }
 
 #[cfg(test)]
