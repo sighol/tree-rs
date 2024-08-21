@@ -23,10 +23,10 @@ pub fn path_to_str(path: &Path) -> &str {
 }
 
 impl IteratorItem {
-    fn new(path: &Path, level: usize, is_last: bool) -> IteratorItem {
+    fn new(path: &Path, level: usize, is_last: bool) -> Self {
         let metadata = path.symlink_metadata();
 
-        IteratorItem {
+        Self {
             file_name: String::from(path_to_str(path)),
             path: path.to_owned(),
             metadata,
@@ -36,11 +36,7 @@ impl IteratorItem {
     }
 
     pub fn is_dir(&self) -> bool {
-        if let Ok(ref metadata) = self.metadata {
-            metadata.is_dir()
-        } else {
-            false
-        }
+        self.metadata.as_ref().is_ok_and(Metadata::is_dir)
     }
 }
 
@@ -76,30 +72,23 @@ impl FileIterator {
     }
 
     fn is_glob_included(&self, file_name: &str) -> bool {
-        if let Some(ref glob) = self.config.include_glob {
-            glob.is_match(file_name)
-        } else {
-            true
-        }
+        self.config
+            .include_glob
+            .as_ref()
+            .map_or(true, |glob| glob.is_match(file_name))
     }
 
     fn is_included(&self, name: &str, is_dir: bool) -> bool {
-        if !self.config.show_hidden && name.starts_with('.') {
-            return false;
-        }
-
-        if is_dir {
-            true
-        } else {
-            self.is_glob_included(name)
-        }
+        (!name.starts_with('.') && self.config.show_hidden) || is_dir || self.is_glob_included(name)
     }
 
     fn push_dir(&mut self, item: &IteratorItem) {
-        let entries = get_sorted_dir_entries(&item.path).expect(&format!(
-            "Couldn't retrieve files in directory: {}",
-            item.path.display()
-        ));
+        let entries = get_sorted_dir_entries(&item.path).unwrap_or_else(|_| {
+            panic!(
+                "Couldn't retrieve files in directory: {}",
+                item.path.display()
+            )
+        });
 
         let mut entries: Vec<IteratorItem> = entries
             .iter()

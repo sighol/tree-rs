@@ -16,5 +16,5 @@ edition = "2021"
 
 [dependencies]
 clap = { version = "4", features = ["derive"] }
-term = "0.7"
+term = "1.0"
 globset = "0.4"
