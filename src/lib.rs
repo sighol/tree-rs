@@ -103,7 +103,7 @@ impl DirEntrySummary {
 }
 
 #[cfg(not(target_os = "linux"))]
-fn is_executable(metadata: &Metadata) -> bool {
+fn is_executable(_metadata: &Metadata) -> bool {
     false
 }
 
@@ -177,6 +177,9 @@ impl<'a, T: Terminal<Output = W>, W: std::io::Write> TreePrinter<'a, T, W> {
         list
     }
 
+    /// # Errors
+    ///
+    /// Will return an error if printing to the terminal fails.
     pub fn iterate_folders(&mut self, path: &Path) -> io::Result<DirEntrySummary> {
         let mut summary = DirEntrySummary::new();
 
