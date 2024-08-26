@@ -121,6 +121,17 @@ pub struct Config {
     pub include_glob: Option<GlobMatcher>,
 }
 
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            use_color: false,
+            show_hidden: false,
+            max_level: usize::MAX,
+            include_glob: None,
+        }
+    }
+}
+
 pub struct TreePrinter<'a, T, W>
 where
     W: Write,
