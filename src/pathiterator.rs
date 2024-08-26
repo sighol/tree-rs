@@ -65,8 +65,6 @@ fn get_sorted_dir_entries(path: &Path) -> io::Result<Vec<DirEntry>> {
 }
 
 impl FileIterator {
-    // I have no idea why this is considered dead_code by rustc.
-    #[allow(dead_code)]
     pub fn new(path: &Path, config: FileIteratorConfig) -> FileIterator {
         let mut queue = VecDeque::new();
         queue.push_back(IteratorItem::new(path, 0, true));

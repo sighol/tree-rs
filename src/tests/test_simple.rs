@@ -1,11 +1,9 @@
-mod test_terminal;
-
 use std::fs::create_dir_all;
 use std::path::Path;
 
+use crate::tests::utils::TestTerminal;
+use crate::{tree_printer::DirEntrySummary, Config, TreePrinter};
 use globset::Glob;
-use test_terminal::TestTerminal;
-use tree_rs::{Config, DirEntrySummary, TreePrinter};
 
 fn run_cmd(path: &Path, config: Config) -> (String, DirEntrySummary) {
     let mut writer = TestTerminal::new();

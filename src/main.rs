@@ -1,8 +1,15 @@
 #![deny(clippy::pedantic)]
 #![deny(clippy::all)]
 
+mod filter;
+mod pathiterator;
+mod tree_printer;
+
+#[cfg(test)]
+mod tests;
+
 use clap::Parser;
-use tree_rs::{Config, TreePrinter};
+use tree_printer::{Config, TreePrinter};
 
 use std::error::Error;
 use std::io::{self, Write};
@@ -10,9 +17,6 @@ use std::path::Path;
 
 use globset::Glob;
 use term::TerminfoTerminal;
-
-mod filter;
-mod pathiterator;
 
 #[derive(Debug, Parser)]
 struct Args {
