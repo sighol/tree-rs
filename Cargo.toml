@@ -18,3 +18,4 @@ edition = "2021"
 clap = { version = "4", features = ["derive"] }
 term = "1.0"
 globset = "0.4"
+anyhow = "1.0.86"
