@@ -8,8 +8,7 @@ use std::path::Path;
 use globset::GlobMatcher;
 use term::{color, Terminal};
 
-mod filter;
-mod pathiterator;
+use crate::{filter, pathiterator};
 
 mod dirsign {
     pub const HORZ: char = '─';
