@@ -43,6 +43,7 @@ impl IteratorItem {
 #[derive(Debug)]
 pub struct FileIteratorConfig {
     pub show_hidden: bool,
+    pub show_only_dirs: bool,
     pub max_level: usize,
     pub include_glob: Option<GlobMatcher>,
 }
@@ -57,9 +58,18 @@ fn order_dir_entry(a: &DirEntry, b: &DirEntry) -> Ordering {
     b.file_name().cmp(&a.file_name())
 }
 
-fn get_sorted_dir_entries(path: &Path) -> io::Result<Vec<DirEntry>> {
+fn get_sorted_dir_entries(path: &Path, only_dirs: bool) -> io::Result<Vec<DirEntry>> {
     let entries = fs::read_dir(path)?;
-    let mut dir_entries: Vec<DirEntry> = entries.into_iter().collect::<io::Result<Vec<_>>>()?;
+    let mut dir_entries: Vec<DirEntry> = entries
+        .into_iter()
+        .filter(|entry| {
+            entry.as_ref().is_ok_and(|entry| {
+                entry
+                    .metadata()
+                    .is_ok_and(|meta| !only_dirs || meta.is_dir())
+            })
+        })
+        .collect::<io::Result<Vec<_>>>()?;
     dir_entries.sort_by(order_dir_entry);
     Ok(dir_entries)
 }
@@ -79,29 +89,24 @@ impl FileIterator {
     }
 
     fn is_included(&self, name: &str, is_dir: bool) -> bool {
-        (!name.starts_with('.') && self.config.show_hidden) || is_dir || self.is_glob_included(name)
+        (self.config.show_hidden || !name.starts_with('.'))
+            && (is_dir || self.is_glob_included(name))
     }
 
     fn push_dir(&mut self, item: &IteratorItem) {
-        let entries = get_sorted_dir_entries(&item.path).unwrap_or_else(|_| {
-            panic!(
-                "Couldn't retrieve files in directory: {}",
-                item.path.display()
-            )
-        });
+        let entries = get_sorted_dir_entries(&item.path, self.config.show_only_dirs)
+            .unwrap_or_else(|_| {
+                panic!(
+                    "Couldn't retrieve files in directory: {}",
+                    item.path.display()
+                )
+            });
 
-        let mut entries: Vec<IteratorItem> = entries
-            .iter()
-            .map(|e| IteratorItem::new(&e.path(), item.level + 1, false))
-            .filter(|item| self.is_included(&item.file_name, item.is_dir()))
-            .collect();
-
-        if let Some(item) = entries.first_mut() {
-            item.is_last = true;
-        }
-
-        for item in entries {
-            self.queue.push_back(item);
+        for (index, entry) in entries.iter().enumerate() {
+            let item = IteratorItem::new(&entry.path(), item.level + 1, index == 0);
+            if self.is_included(&item.file_name, item.is_dir()) {
+                self.queue.push_back(item);
+            }
         }
     }
 }
