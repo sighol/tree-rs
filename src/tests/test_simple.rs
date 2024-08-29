@@ -79,3 +79,26 @@ fn test_filter_txt_files() {
 
     assert_eq!(expected, output);
 }
+
+#[test]
+fn test_only_directories() {
+    let expected = r#"simple
+└── yyy
+    ├── k
+    ├── s
+    └── zz
+        └── a
+            └── b
+"#;
+    let (output, summary) = run_cmd(
+        Path::new("tests/simple"),
+        Config {
+            show_only_dirs: true,
+            ..Default::default()
+        },
+    );
+
+    assert_eq!(expected, output);
+    assert_eq!(6, summary.num_folders);
+    assert_eq!(0, summary.num_files);
+}
