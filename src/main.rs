@@ -18,6 +18,7 @@ use std::path::Path;
 use globset::Glob;
 use term::TerminfoTerminal;
 
+#[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Parser)]
 struct Args {
     /// Show hidden files
@@ -38,6 +39,9 @@ struct Args {
     /// Descend only <level> directories deep
     #[clap(short = 'L', long = "level", default_value_t = usize::max_value())]
     max_level: usize,
+    /// List directories only
+    #[clap(short = 'd', default_value = "false")]
+    only_dirs: bool,
 }
 
 impl TryFrom<&Args> for Config {
@@ -55,6 +59,7 @@ impl TryFrom<&Args> for Config {
         Ok(Config {
             use_color: value.color_on || !value.color_off,
             show_hidden: value.show_all,
+            show_only_dirs: value.only_dirs,
             max_level: value.max_level,
             include_glob,
         })
@@ -75,11 +80,15 @@ fn main() -> Result<(), Box<dyn Error>> {
             .map_err(|e| format!("Program failed with error: {e}"))?
     };
 
-    writeln!(
-        &mut term,
-        "\n{} directories, {} files",
-        summary.num_folders, summary.num_files
-    )
+    if args.only_dirs {
+        writeln!(&mut term, "\n{} directories", summary.num_folders)
+    } else {
+        writeln!(
+            &mut term,
+            "\n{} directories, {} files",
+            summary.num_folders, summary.num_files
+        )
+    }
     .map_err(|e| format!("Failed to print summary: {e}"))?;
 
     Ok(())

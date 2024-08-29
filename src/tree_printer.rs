@@ -116,6 +116,7 @@ fn is_executable(metadata: &Metadata) -> bool {
 pub struct Config {
     pub use_color: bool,
     pub show_hidden: bool,
+    pub show_only_dirs: bool,
     pub max_level: usize,
     pub include_glob: Option<GlobMatcher>,
 }
@@ -125,6 +126,7 @@ impl Default for Config {
         Self {
             use_color: false,
             show_hidden: false,
+            show_only_dirs: false,
             max_level: usize::MAX,
             include_glob: None,
         }
@@ -165,6 +167,7 @@ impl<'a, T: Terminal<Output = W>, W: std::io::Write> TreePrinter<'a, T, W> {
             include_glob: self.config.include_glob.clone(),
             max_level: self.config.max_level,
             show_hidden: self.config.show_hidden,
+            show_only_dirs: self.config.show_only_dirs,
         };
 
         let list = pathiterator::FileIterator::new(path, config);
