@@ -45,7 +45,8 @@ pub struct FileIteratorConfig {
     pub show_hidden: bool,
     pub show_only_dirs: bool,
     pub max_level: usize,
-    pub include_glob: Option<GlobMatcher>,
+    pub include_globs: Vec<GlobMatcher>,
+    pub exlude_globs: Vec<GlobMatcher>,
 }
 
 #[derive(Debug)]
@@ -82,10 +83,13 @@ impl FileIterator {
     }
 
     fn is_glob_included(&self, file_name: &str) -> bool {
-        self.config
-            .include_glob
-            .as_ref()
-            .map_or(true, |glob| glob.is_match(file_name))
+        let incl = &self.config.include_globs;
+        let excl = &self.config.exlude_globs;
+
+        let not_exclude = excl.is_empty() || excl.iter().all(|glob| !glob.is_match(file_name));
+        let include = incl.is_empty() || incl.iter().any(|glob| glob.is_match(file_name));
+
+        not_exclude && include
     }
 
     fn is_included(&self, name: &str, is_dir: bool) -> bool {
@@ -117,6 +121,7 @@ impl Iterator for FileIterator {
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(item) = self.queue.pop_back() {
             if item.is_dir() && item.level < self.config.max_level {
+                // println!("{:?}", item.file_name);
                 self.push_dir(&item);
             }
 

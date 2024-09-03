@@ -22,17 +22,6 @@ impl FilteredIterator {
     pub fn skip_filter(&mut self) {
         self.skip = true;
     }
-
-    /// Remove previous directories from cache that shouldn't be
-    /// shown because they are empty.
-    fn remove_empty_directories_from_cache(&mut self, item: &IteratorItem) {
-        while let Some(last) = self.cache.pop_back() {
-            if last.level < item.level {
-                self.cache.push_back(last);
-                break;
-            }
-        }
-    }
 }
 
 impl Iterator for FilteredIterator {
@@ -51,14 +40,12 @@ impl Iterator for FilteredIterator {
             return Some(next_item);
         }
 
-        while let Some(item) = self.source.next() {
-            self.remove_empty_directories_from_cache(&item);
-
+        for item in self.source.by_ref() {
             if item.is_dir() {
                 self.cache.push_back(item);
             } else {
-                // If the cache already contains a folder, start emptying cache, and
-                // save the item.
+                // If the cache already contains a folder, 
+                // start emptying cache, and save the item.
                 if let Some(cache_front) = self.cache.pop_front() {
                     self.next_item = Some(item);
                     return Some(cache_front);
