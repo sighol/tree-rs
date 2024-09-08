@@ -79,6 +79,7 @@ fn test_filter_txt_files() {
             ..Default::default()
         },
     );
+
     assert_eq!(6, summary.num_folders);
     assert_eq!(1, summary.num_files);
 
@@ -109,7 +110,6 @@ fn test_exclude_txt_files() {
 
     assert_eq!(6, summary.num_folders);
     assert_eq!(3, summary.num_files);
-
     assert_eq!(expected, output);
 }
 

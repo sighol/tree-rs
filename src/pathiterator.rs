@@ -119,15 +119,12 @@ impl Iterator for FileIterator {
     type Item = IteratorItem;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if let Some(item) = self.queue.pop_back() {
+        self.queue.pop_back().map(|item| {
             if item.is_dir() && item.level < self.config.max_level {
-                // println!("{:?}", item.file_name);
                 self.push_dir(&item);
             }
 
-            Some(item)
-        } else {
-            None
-        }
+            item
+        })
     }
 }

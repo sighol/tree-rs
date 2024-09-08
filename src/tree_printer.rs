@@ -173,13 +173,8 @@ impl<'a, T: Terminal<Output = W>, W: std::io::Write> TreePrinter<'a, T, W> {
             show_only_dirs: self.config.show_only_dirs,
         };
 
-        let list = pathiterator::FileIterator::new(path, config);
-        let mut list = filter::FilteredIterator::new(list);
-        if self.config.include_globs.is_empty() && self.config.exlude_globs.is_empty() {
-            list.skip_filter();
-        }
-
-        list
+        let iterator = pathiterator::FileIterator::new(path, config);
+        filter::FilteredIterator::new(iterator)
     }
 
     /// # Errors
