@@ -35,7 +35,10 @@ struct Args {
     dir: String,
     /// List only those files matching <`include_pattern`>
     #[clap(short = 'P')]
-    include_pattern: Option<String>,
+    include_pattern: Vec<String>,
+    /// Exclude any files matching <`exclude_pattern`>
+    #[clap(short = 'I')]
+    exclude_pattern: Vec<String>,
     /// Descend only <level> directories deep
     #[clap(short = 'L', long = "level", default_value_t = usize::max_value())]
     max_level: usize,
@@ -48,20 +51,29 @@ impl TryFrom<&Args> for Config {
     type Error = String;
 
     fn try_from(value: &Args) -> Result<Self, Self::Error> {
-        let include_glob = value
-            .include_pattern
-            .as_deref()
-            .map(Glob::new)
-            .transpose()
-            .map_err(|e| format!("`include_pattern` is not valid: {e}"))?
-            .map(|glob| glob.compile_matcher());
+        let mut include_globs = Vec::with_capacity(value.include_pattern.len());
+
+        for pattern in &value.include_pattern {
+            let glob =
+                Glob::new(pattern).map_err(|e| format!("`include_pattern` is not valid: {e}"))?;
+            include_globs.push(glob.compile_matcher());
+        }
+
+        let mut exlude_globs = Vec::with_capacity(value.exclude_pattern.len());
+
+        for pattern in &value.exclude_pattern {
+            let glob =
+                Glob::new(pattern).map_err(|e| format!("`exclude_pattern` is not valid: {e}"))?;
+            exlude_globs.push(glob.compile_matcher());
+        }
 
         Ok(Config {
             use_color: value.color_on || !value.color_off,
             show_hidden: value.show_all,
             show_only_dirs: value.only_dirs,
             max_level: value.max_level,
-            include_glob,
+            include_globs,
+            exlude_globs,
         })
     }
 }

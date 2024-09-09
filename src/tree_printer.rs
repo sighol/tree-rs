@@ -118,7 +118,8 @@ pub struct Config {
     pub show_hidden: bool,
     pub show_only_dirs: bool,
     pub max_level: usize,
-    pub include_glob: Option<GlobMatcher>,
+    pub include_globs: Vec<GlobMatcher>,
+    pub exlude_globs: Vec<GlobMatcher>,
 }
 
 impl Default for Config {
@@ -128,7 +129,8 @@ impl Default for Config {
             show_hidden: false,
             show_only_dirs: false,
             max_level: usize::MAX,
-            include_glob: None,
+            include_globs: Vec::new(),
+            exlude_globs: Vec::new(),
         }
     }
 }
@@ -164,19 +166,15 @@ impl<'a, T: Terminal<Output = W>, W: std::io::Write> TreePrinter<'a, T, W> {
 
     fn get_iterator(&self, path: &Path) -> filter::FilteredIterator {
         let config = pathiterator::FileIteratorConfig {
-            include_glob: self.config.include_glob.clone(),
+            include_globs: self.config.include_globs.clone(),
+            exlude_globs: self.config.exlude_globs.clone(),
             max_level: self.config.max_level,
             show_hidden: self.config.show_hidden,
             show_only_dirs: self.config.show_only_dirs,
         };
 
-        let list = pathiterator::FileIterator::new(path, config);
-        let mut list = filter::FilteredIterator::new(list);
-        if self.config.include_glob.is_none() {
-            list.skip_filter();
-        }
-
-        list
+        let iterator = pathiterator::FileIterator::new(path, config);
+        filter::FilteredIterator::new(iterator)
     }
 
     /// # Errors

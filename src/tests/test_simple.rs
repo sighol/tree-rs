@@ -64,19 +64,52 @@ fn test_max_depth() {
 fn test_filter_txt_files() {
     let expected = r#"simple
 └── yyy
+    ├── k
+    ├── s
     ├── test.txt
+    └── zz
+        └── a
+            └── b
 "#;
 
     let (output, summary) = run_cmd(
         Path::new("tests/simple"),
         Config {
-            include_glob: Some(Glob::new("*.txt").unwrap().compile_matcher()),
+            include_globs: vec![Glob::new("*.txt").unwrap().compile_matcher()],
             ..Default::default()
         },
     );
-    assert_eq!(1, summary.num_folders);
+
+    assert_eq!(6, summary.num_folders);
     assert_eq!(1, summary.num_files);
 
+    assert_eq!(expected, output);
+}
+
+#[test]
+fn test_exclude_txt_files() {
+    let expected = r#"simple
+└── yyy
+    ├── k
+    ├── s
+    │   ├── a
+    │   └── t
+    └── zz
+        └── a
+            └── b
+                └── c
+"#;
+
+    let (output, summary) = run_cmd(
+        Path::new("tests/simple"),
+        Config {
+            exlude_globs: vec![Glob::new("*.txt").unwrap().compile_matcher()],
+            ..Default::default()
+        },
+    );
+
+    assert_eq!(6, summary.num_folders);
+    assert_eq!(3, summary.num_files);
     assert_eq!(expected, output);
 }
 
