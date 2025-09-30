@@ -7,9 +7,15 @@ pub struct TestTerminal {
     buffer: Vec<u8>,
 }
 
+impl Default for TestTerminal {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TestTerminal {
     pub fn new() -> Self {
-        return Self { buffer: Vec::new() };
+        Self { buffer: Vec::new() }
     }
 }
 

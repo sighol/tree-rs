@@ -1,5 +1,6 @@
 use std::fs::create_dir_all;
 use std::path::Path;
+use std::sync::Arc;
 
 use crate::tests::utils::TestTerminal;
 use crate::{tree_printer::DirEntrySummary, Config, TreePrinter};
@@ -13,12 +14,12 @@ fn run_cmd(path: &Path, config: Config) -> (String, DirEntrySummary) {
         .map_err(|e| format!("Program failed with error: {e}"))
         .unwrap();
 
-    return (writer.try_into().unwrap(), summary);
+    (writer.try_into().unwrap(), summary)
 }
 
 #[test]
 fn test_normal() {
-    let expected = r#"simple
+    let expected = r"simple
 └── yyy
     ├── k
     ├── s
@@ -29,7 +30,7 @@ fn test_normal() {
         └── a
             └── b
                 └── c
-"#;
+";
 
     let (output, summary) = run_cmd(Path::new("tests/simple"), Config::default());
     assert_eq!(6, summary.num_folders);
@@ -40,13 +41,13 @@ fn test_normal() {
 #[test]
 fn test_max_depth() {
     create_dir_all("tests/simple/yyy/k").unwrap();
-    let expected = r#"simple
+    let expected = r"simple
 └── yyy
     ├── k
     ├── s
     ├── test.txt
     └── zz
-"#;
+";
 
     let (output, summary) = run_cmd(
         Path::new("tests/simple"),
@@ -62,7 +63,7 @@ fn test_max_depth() {
 
 #[test]
 fn test_filter_txt_files() {
-    let expected = r#"simple
+    let expected = r"simple
 └── yyy
     ├── k
     ├── s
@@ -70,12 +71,12 @@ fn test_filter_txt_files() {
     └── zz
         └── a
             └── b
-"#;
+";
 
     let (output, summary) = run_cmd(
         Path::new("tests/simple"),
         Config {
-            include_globs: vec![Glob::new("*.txt").unwrap().compile_matcher()],
+            include_globs: Arc::from(vec![Glob::new("*.txt").unwrap().compile_matcher()]),
             ..Default::default()
         },
     );
@@ -88,7 +89,7 @@ fn test_filter_txt_files() {
 
 #[test]
 fn test_exclude_txt_files() {
-    let expected = r#"simple
+    let expected = r"simple
 └── yyy
     ├── k
     ├── s
@@ -98,12 +99,12 @@ fn test_exclude_txt_files() {
         └── a
             └── b
                 └── c
-"#;
+";
 
     let (output, summary) = run_cmd(
         Path::new("tests/simple"),
         Config {
-            exlude_globs: vec![Glob::new("*.txt").unwrap().compile_matcher()],
+            exclude_globs: Arc::from(vec![Glob::new("*.txt").unwrap().compile_matcher()]),
             ..Default::default()
         },
     );
@@ -115,14 +116,14 @@ fn test_exclude_txt_files() {
 
 #[test]
 fn test_only_directories() {
-    let expected = r#"simple
+    let expected = r"simple
 └── yyy
     ├── k
     ├── s
     └── zz
         └── a
             └── b
-"#;
+";
     let (output, summary) = run_cmd(
         Path::new("tests/simple"),
         Config {

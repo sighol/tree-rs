@@ -1,3 +1,12 @@
+//! Tree visualization and colored output formatting.
+//!
+//! Handles the visual representation of directory trees using Unicode box-drawing
+//! characters and terminal colors. Supports:
+//! - Colored output (directories in blue, executables in green)
+//! - Unicode tree structure characters (├─└│)
+//! - Hierarchical indentation
+//! - Summary statistics (file/directory counts)
+
 #![deny(clippy::pedantic)]
 #![deny(clippy::all)]
 
@@ -5,10 +14,12 @@ use std::fs::Metadata;
 use std::io::{self, Write};
 use std::path::Path;
 
+use std::sync::Arc;
+
 use globset::GlobMatcher;
 use term::{color, Terminal};
 
-use crate::{filter, pathiterator};
+use crate::pathiterator;
 
 mod dirsign {
     pub const HORZ: char = '─';
@@ -101,12 +112,12 @@ impl DirEntrySummary {
     }
 }
 
-#[cfg(not(target_os = "linux"))]
+#[cfg(not(unix))]
 fn is_executable(_metadata: &Metadata) -> bool {
     false
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(unix)]
 fn is_executable(metadata: &Metadata) -> bool {
     use std::os::unix::fs::PermissionsExt;
     let mode = metadata.permissions().mode();
@@ -118,8 +129,8 @@ pub struct Config {
     pub show_hidden: bool,
     pub show_only_dirs: bool,
     pub max_level: usize,
-    pub include_globs: Vec<GlobMatcher>,
-    pub exlude_globs: Vec<GlobMatcher>,
+    pub include_globs: Arc<[GlobMatcher]>,
+    pub exclude_globs: Arc<[GlobMatcher]>,
 }
 
 impl Default for Config {
@@ -129,8 +140,8 @@ impl Default for Config {
             show_hidden: false,
             show_only_dirs: false,
             max_level: usize::MAX,
-            include_globs: Vec::new(),
-            exlude_globs: Vec::new(),
+            include_globs: Arc::new([]),
+            exclude_globs: Arc::new([]),
         }
     }
 }
@@ -164,17 +175,16 @@ impl<'a, T: Terminal<Output = W>, W: std::io::Write> TreePrinter<'a, T, W> {
         }
     }
 
-    fn get_iterator(&self, path: &Path) -> filter::FilteredIterator {
+    fn get_iterator(&self, path: &Path) -> pathiterator::FileIterator {
         let config = pathiterator::FileIteratorConfig {
-            include_globs: self.config.include_globs.clone(),
-            exlude_globs: self.config.exlude_globs.clone(),
+            include_globs: Arc::clone(&self.config.include_globs),
+            exclude_globs: Arc::clone(&self.config.exclude_globs),
             max_level: self.config.max_level,
             show_hidden: self.config.show_hidden,
             show_only_dirs: self.config.show_only_dirs,
         };
 
-        let iterator = pathiterator::FileIterator::new(path, config);
-        filter::FilteredIterator::new(iterator)
+        pathiterator::FileIterator::new(path, config)
     }
 
     /// # Errors
@@ -189,17 +199,18 @@ impl<'a, T: Terminal<Output = W>, W: std::io::Write> TreePrinter<'a, T, W> {
         for entry in self.get_iterator(path) {
             Self::update_levels(&mut levels, entry.level, entry.is_last);
 
-            if entry.is_dir() {
-                summary.num_folders += 1;
-            } else {
-                summary.num_files += 1;
+            // Don't count the root directory (level 0)
+            if entry.level > 0 {
+                if entry.is_dir() {
+                    summary.num_folders += 1;
+                } else {
+                    summary.num_files += 1;
+                }
             }
 
             set_line_prefix(&levels, &mut prefix);
             self.print_line(&entry, &prefix)?;
         }
-
-        summary.num_folders = summary.num_folders.saturating_sub(1);
 
         Ok(summary)
     }
@@ -208,8 +219,8 @@ impl<'a, T: Terminal<Output = W>, W: std::io::Write> TreePrinter<'a, T, W> {
         write!(self.term, "{prefix}")?;
         if let Ok(ref metadata) = entry.metadata {
             print_path(&entry.file_name, metadata, self.term, &self.config)?;
-        } else {
-            eprint!("{} [Error]", entry.file_name);
+        } else if let Err(ref e) = entry.metadata {
+            eprintln!("{} [Error: {}]", entry.file_name, e);
         }
 
         writeln!(self.term)?;

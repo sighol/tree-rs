@@ -1,7 +1,11 @@
+//! tree-rs: A cross-platform reimplementation of the Unix `tree` command.
+//!
+//! Displays directory structures in a tree-like format with colored output
+//! and support for filtering, depth limiting, and pattern matching.
+
 #![deny(clippy::pedantic)]
 #![deny(clippy::all)]
 
-mod filter;
 mod pathiterator;
 mod tree_printer;
 
@@ -11,9 +15,10 @@ mod tests;
 use clap::Parser;
 use tree_printer::{Config, TreePrinter};
 
-use std::error::Error;
-use std::io::{self, Write};
+use anyhow::{Context, Result};
+use std::io::{self, IsTerminal, Write};
 use std::path::Path;
+use std::sync::Arc;
 
 use globset::Glob;
 use term::TerminfoTerminal;
@@ -48,48 +53,55 @@ struct Args {
 }
 
 impl TryFrom<&Args> for Config {
-    type Error = String;
+    type Error = anyhow::Error;
 
     fn try_from(value: &Args) -> Result<Self, Self::Error> {
         let mut include_globs = Vec::with_capacity(value.include_pattern.len());
 
         for pattern in &value.include_pattern {
-            let glob =
-                Glob::new(pattern).map_err(|e| format!("`include_pattern` is not valid: {e}"))?;
+            let glob = Glob::new(pattern).context("Invalid include_pattern")?;
             include_globs.push(glob.compile_matcher());
         }
 
-        let mut exlude_globs = Vec::with_capacity(value.exclude_pattern.len());
+        let mut exclude_globs = Vec::with_capacity(value.exclude_pattern.len());
 
         for pattern in &value.exclude_pattern {
-            let glob =
-                Glob::new(pattern).map_err(|e| format!("`exclude_pattern` is not valid: {e}"))?;
-            exlude_globs.push(glob.compile_matcher());
+            let glob = Glob::new(pattern).context("Invalid exclude_pattern")?;
+            exclude_globs.push(glob.compile_matcher());
         }
 
+        let use_color = if value.color_on {
+            true
+        } else if value.color_off {
+            false
+        } else {
+            // Default: enable color only if stdout is a TTY
+            io::stdout().is_terminal()
+        };
+
         Ok(Config {
-            use_color: value.color_on || !value.color_off,
+            use_color,
             show_hidden: value.show_all,
             show_only_dirs: value.only_dirs,
             max_level: value.max_level,
-            include_globs,
-            exlude_globs,
+            include_globs: Arc::from(include_globs),
+            exclude_globs: Arc::from(exclude_globs),
         })
     }
 }
 
-fn main() -> Result<(), Box<dyn Error>> {
+fn main() -> Result<()> {
     let args = Args::parse();
     let config = Config::try_from(&args)?;
 
     let path = Path::new(args.dir.as_str());
 
     let mut term = TerminfoTerminal::new(io::stdout())
-        .ok_or(anyhow::anyhow!("Could not find colored terminal"))?;
+        .ok_or_else(|| anyhow::anyhow!("Could not find colored terminal"))?;
     let summary = {
         let mut p = TreePrinter::new(config, &mut term);
         p.iterate_folders(path)
-            .map_err(|e| format!("Program failed with error: {e}"))?
+            .context("Failed to iterate folders")?
     };
 
     if args.only_dirs {
@@ -101,7 +113,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             summary.num_folders, summary.num_files
         )
     }
-    .map_err(|e| format!("Failed to print summary: {e}"))?;
+    .context("Failed to print summary")?;
 
     Ok(())
 }
