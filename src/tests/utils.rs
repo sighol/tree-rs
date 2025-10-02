@@ -41,57 +41,57 @@ impl Terminal for TestTerminal {
     type Output = Vec<u8>;
 
     fn fg(&mut self, _: term::color::Color) -> term::Result<()> {
-        todo!()
+        Ok(())
     }
 
     fn bg(&mut self, _: term::color::Color) -> term::Result<()> {
-        todo!()
+        Ok(())
     }
 
     fn attr(&mut self, _: term::Attr) -> term::Result<()> {
-        todo!()
+        Ok(())
     }
 
     fn supports_attr(&self, _: term::Attr) -> bool {
-        todo!()
+        true
     }
 
     fn reset(&mut self) -> term::Result<()> {
-        todo!()
+        Ok(())
     }
 
     fn supports_reset(&self) -> bool {
-        todo!()
+        true
     }
 
     fn supports_color(&self) -> bool {
-        todo!()
+        true
     }
 
     fn cursor_up(&mut self) -> term::Result<()> {
-        todo!()
+        Ok(())
     }
 
     fn delete_line(&mut self) -> term::Result<()> {
-        todo!()
+        Ok(())
     }
 
     fn carriage_return(&mut self) -> term::Result<()> {
-        todo!()
+        Ok(())
     }
 
     fn get_ref(&self) -> &Self::Output {
-        todo!()
+        &self.buffer
     }
 
     fn get_mut(&mut self) -> &mut Self::Output {
-        todo!()
+        &mut self.buffer
     }
 
     fn into_inner(self) -> Self::Output
     where
         Self: Sized,
     {
-        todo!()
+        self.buffer
     }
 }
