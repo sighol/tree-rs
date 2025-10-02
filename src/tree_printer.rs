@@ -13,12 +13,11 @@
 use std::fs::Metadata;
 use std::io::{self, Write};
 use std::path::Path;
-
 use std::sync::Arc;
 
-use globset::GlobMatcher;
 use term::{color, Terminal};
 
+use crate::config::Config;
 use crate::pathiterator;
 
 mod dirsign {
@@ -122,28 +121,6 @@ fn is_executable(metadata: &Metadata) -> bool {
     use std::os::unix::fs::PermissionsExt;
     let mode = metadata.permissions().mode();
     (mode & 0o100) != 0
-}
-
-pub struct Config {
-    pub use_color: bool,
-    pub show_hidden: bool,
-    pub show_only_dirs: bool,
-    pub max_level: usize,
-    pub include_globs: Arc<[GlobMatcher]>,
-    pub exclude_globs: Arc<[GlobMatcher]>,
-}
-
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            use_color: false,
-            show_hidden: false,
-            show_only_dirs: false,
-            max_level: usize::MAX,
-            include_globs: Arc::new([]),
-            exclude_globs: Arc::new([]),
-        }
-    }
 }
 
 pub struct TreePrinter<'a, T, W>
