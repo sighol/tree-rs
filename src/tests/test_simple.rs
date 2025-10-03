@@ -1,4 +1,4 @@
-use std::fs::{create_dir_all, File};
+use std::fs::File;
 use std::path::Path;
 use std::sync::Arc;
 
@@ -34,8 +34,6 @@ fn test_normal() {
 
 #[test]
 fn test_max_depth() {
-    create_dir_all("tests/simple/yyy/k").unwrap();
-
     let (output, summary) = run_cmd(
         Path::new("tests/simple"),
         Config {
