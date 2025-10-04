@@ -1,6 +1,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Crates.io](https://img.shields.io/crates/v/tree-rs.svg)](https://crates.io/crates/tree-rs)
 [![Rust CI](https://github.com/sighol/tree-rs/actions/workflows/rust-ci.yaml/badge.svg)](https://github.com/sighol/tree-rs/actions/workflows/rust-ci.yaml)
+[![Coverage](https://img.shields.io/badge/coverage-96%25-brightgreen)](https://github.com/sighol/tree-rs)
 
 # Tree-rs
 
@@ -29,3 +30,7 @@ cargo install tree-rs
 # or
 cargo install --git https://github.com/sighol/tree-rs
 ```
+
+## How close to actual `tree`?
+
+See [progress](PROGRESS.md) for a detailed comparison with the original `tree` command.
