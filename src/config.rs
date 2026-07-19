@@ -44,14 +44,20 @@ pub struct Args {
     /// List directories only
     #[clap(short = 'd', default_value = "false")]
     pub only_dirs: bool,
+
+    /// Follow symbolic links to directories
+    #[clap(short = 'l')]
+    pub follow_symlinks: bool,
 }
 
 /// Configuration for tree traversal and display
+#[allow(clippy::struct_excessive_bools)]
 #[derive(Debug)]
 pub struct Config {
     pub use_color: bool,
     pub show_hidden: bool,
     pub show_only_dirs: bool,
+    pub follow_symlinks: bool,
     pub max_level: usize,
     pub include_globs: Arc<[GlobMatcher]>,
     pub exclude_globs: Arc<[GlobMatcher]>,
@@ -63,6 +69,7 @@ impl Default for Config {
             use_color: false,
             show_hidden: false,
             show_only_dirs: false,
+            follow_symlinks: false,
             max_level: usize::MAX,
             include_globs: Arc::new([]),
             exclude_globs: Arc::new([]),
@@ -101,6 +108,7 @@ impl TryFrom<&Args> for Config {
             use_color,
             show_hidden: value.show_all,
             show_only_dirs: value.only_dirs,
+            follow_symlinks: value.follow_symlinks,
             max_level: value.max_level,
             include_globs: Arc::from(include_globs),
             exclude_globs: Arc::from(exclude_globs),

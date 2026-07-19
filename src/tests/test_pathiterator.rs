@@ -3,6 +3,17 @@ use std::path::Path;
 use crate::pathiterator::{path_to_str, FileIterator, FileIteratorConfig};
 use std::sync::Arc;
 
+fn iterator_config() -> FileIteratorConfig {
+    FileIteratorConfig {
+        show_hidden: false,
+        show_only_dirs: false,
+        follow_symlinks: false,
+        max_level: usize::MAX,
+        include_globs: Arc::new([]),
+        exclude_globs: Arc::new([]),
+    }
+}
+
 #[test]
 fn test_path_to_str_with_root_path() {
     // Test with a path that has no filename (e.g., "/")
@@ -27,13 +38,7 @@ fn test_iterator_with_empty_directory() {
     let empty_dir = "tests/empty_test_dir";
     fs::create_dir_all(empty_dir).unwrap();
 
-    let config = FileIteratorConfig {
-        show_hidden: false,
-        show_only_dirs: false,
-        max_level: usize::MAX,
-        include_globs: Arc::new([]),
-        exclude_globs: Arc::new([]),
-    };
+    let config = iterator_config();
 
     let iterator = FileIterator::new(Path::new(empty_dir), config);
     let items: Vec<_> = iterator.collect();
@@ -62,13 +67,7 @@ fn test_unreadable_directory() {
     perms.set_mode(0o000);
     fs::set_permissions(&sub_dir, perms.clone()).unwrap();
 
-    let config = FileIteratorConfig {
-        show_hidden: false,
-        show_only_dirs: false,
-        max_level: usize::MAX,
-        include_globs: Arc::new([]),
-        exclude_globs: Arc::new([]),
-    };
+    let config = iterator_config();
 
     let iterator = FileIterator::new(Path::new(test_dir), config);
     let items: Vec<_> = iterator.collect();
@@ -85,11 +84,8 @@ fn test_unreadable_directory() {
 #[test]
 fn test_iterator_max_level_zero() {
     let config = FileIteratorConfig {
-        show_hidden: false,
-        show_only_dirs: false,
         max_level: 0,
-        include_globs: Arc::new([]),
-        exclude_globs: Arc::new([]),
+        ..iterator_config()
     };
 
     let iterator = FileIterator::new(Path::new("tests/simple"), config);
@@ -111,13 +107,7 @@ fn test_iterator_with_hidden_files() {
     File::create(format!("{test_dir}/visible.txt")).unwrap();
 
     // Test without showing hidden files
-    let config = FileIteratorConfig {
-        show_hidden: false,
-        show_only_dirs: false,
-        max_level: usize::MAX,
-        include_globs: Arc::new([]),
-        exclude_globs: Arc::new([]),
-    };
+    let config = iterator_config();
 
     let iterator = FileIterator::new(Path::new(test_dir), config);
     let items: Vec<_> = iterator.collect();
@@ -126,10 +116,7 @@ fn test_iterator_with_hidden_files() {
     // Test with showing hidden files
     let config_with_hidden = FileIteratorConfig {
         show_hidden: true,
-        show_only_dirs: false,
-        max_level: usize::MAX,
-        include_globs: Arc::new([]),
-        exclude_globs: Arc::new([]),
+        ..iterator_config()
     };
 
     let iterator_with_hidden = FileIterator::new(Path::new(test_dir), config_with_hidden);

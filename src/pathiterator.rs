@@ -34,8 +34,8 @@ pub fn path_to_str(path: &Path) -> &str {
 }
 
 impl IteratorItem {
-    fn new(path: &Path, level: usize, is_last: bool) -> Self {
-        let metadata = path.symlink_metadata();
+    fn new(path: &Path, level: usize, is_last: bool, follow_symlinks: bool) -> Self {
+        let metadata = path_metadata(path, follow_symlinks);
 
         Self {
             file_name: String::from(path_to_str(path)),
@@ -46,10 +46,14 @@ impl IteratorItem {
         }
     }
 
-    fn from_dir_entry(entry: &DirEntry, level: usize, is_last: bool) -> Self {
+    fn from_dir_entry(
+        entry: &DirEntry,
+        level: usize,
+        is_last: bool,
+        follow_symlinks: bool,
+    ) -> Self {
         let path = entry.path();
-        // Reuse metadata from DirEntry to avoid duplicate syscall
-        let metadata = entry.metadata();
+        let metadata = entry_metadata(entry, follow_symlinks);
 
         Self {
             file_name: String::from(path_to_str(&path)),
@@ -69,6 +73,7 @@ impl IteratorItem {
 pub struct FileIteratorConfig {
     pub show_hidden: bool,
     pub show_only_dirs: bool,
+    pub follow_symlinks: bool,
     pub max_level: usize,
     pub include_globs: Arc<[GlobMatcher]>,
     pub exclude_globs: Arc<[GlobMatcher]>,
@@ -87,15 +92,34 @@ fn order_dir_entry(a: &DirEntry, b: &DirEntry) -> Ordering {
     b.file_name().cmp(&a.file_name())
 }
 
-fn get_sorted_dir_entries(path: &Path, only_dirs: bool) -> io::Result<Vec<DirEntry>> {
+fn path_metadata(path: &Path, follow_symlinks: bool) -> io::Result<Metadata> {
+    if follow_symlinks {
+        fs::metadata(path).or_else(|_| path.symlink_metadata())
+    } else {
+        path.symlink_metadata()
+    }
+}
+
+fn entry_metadata(entry: &DirEntry, follow_symlinks: bool) -> io::Result<Metadata> {
+    if follow_symlinks {
+        let path = entry.path();
+        fs::metadata(&path).or_else(|_| path.symlink_metadata())
+    } else {
+        entry.metadata()
+    }
+}
+
+fn get_sorted_dir_entries(
+    path: &Path,
+    only_dirs: bool,
+    follow_symlinks: bool,
+) -> io::Result<Vec<DirEntry>> {
     let entries = fs::read_dir(path)?;
     let mut dir_entries: Vec<DirEntry> = entries
         .into_iter()
         .filter(|entry| {
             entry.as_ref().is_ok_and(|entry| {
-                entry
-                    .metadata()
-                    .is_ok_and(|meta| !only_dirs || meta.is_dir())
+                entry_metadata(entry, follow_symlinks).is_ok_and(|meta| !only_dirs || meta.is_dir())
             })
         })
         .collect::<io::Result<Vec<_>>>()?;
@@ -106,7 +130,7 @@ fn get_sorted_dir_entries(path: &Path, only_dirs: bool) -> io::Result<Vec<DirEnt
 impl FileIterator {
     pub fn new(path: &Path, config: FileIteratorConfig) -> FileIterator {
         let mut queue = VecDeque::new();
-        queue.push_back(IteratorItem::new(path, 0, true));
+        queue.push_back(IteratorItem::new(path, 0, true, config.follow_symlinks));
         FileIterator { queue, config }
     }
 
@@ -126,7 +150,11 @@ impl FileIterator {
     }
 
     fn push_dir(&mut self, item: &IteratorItem) {
-        let entries = match get_sorted_dir_entries(&item.path, self.config.show_only_dirs) {
+        let entries = match get_sorted_dir_entries(
+            &item.path,
+            self.config.show_only_dirs,
+            self.config.follow_symlinks,
+        ) {
             Ok(entries) => entries,
             Err(e) => {
                 eprintln!(
@@ -139,7 +167,12 @@ impl FileIterator {
         };
 
         for (index, entry) in entries.iter().enumerate() {
-            let item = IteratorItem::from_dir_entry(entry, item.level + 1, index == 0);
+            let item = IteratorItem::from_dir_entry(
+                entry,
+                item.level + 1,
+                index == 0,
+                self.config.follow_symlinks,
+            );
             if self.is_included(&item.file_name, item.is_dir()) {
                 self.queue.push_back(item);
             }

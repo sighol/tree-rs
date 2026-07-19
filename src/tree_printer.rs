@@ -159,6 +159,7 @@ impl<'a, T: Terminal<Output = W>, W: std::io::Write> TreePrinter<'a, T, W> {
             max_level: self.config.max_level,
             show_hidden: self.config.show_hidden,
             show_only_dirs: self.config.show_only_dirs,
+            follow_symlinks: self.config.follow_symlinks,
         };
 
         pathiterator::FileIterator::new(path, config)

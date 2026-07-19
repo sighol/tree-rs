@@ -10,6 +10,16 @@ use crate::tests::utils::TestTerminal;
 use crate::tree_printer::{DirEntrySummary, TreePrinter};
 use globset::Glob;
 
+#[cfg(unix)]
+fn create_dir_symlink(target: &Path, link: &Path) -> std::io::Result<()> {
+    std::os::unix::fs::symlink(target, link)
+}
+
+#[cfg(windows)]
+fn create_dir_symlink(target: &Path, link: &Path) -> std::io::Result<()> {
+    std::os::windows::fs::symlink_dir(target, link)
+}
+
 fn run_cmd(path: &Path, config: Config) -> (String, DirEntrySummary) {
     let mut writer = TestTerminal::new();
     let mut p = TreePrinter::new(config, &mut writer);
@@ -240,6 +250,68 @@ fn test_broken_symlink() {
 
     // Should handle broken symlink gracefully
     assert!(output.contains("simple"));
+}
+
+#[test]
+#[cfg(any(unix, windows))]
+fn test_follow_symlink_directory() {
+    use std::fs;
+
+    let base = Path::new("tests/symlink_follow_test");
+    let view_dir = base.join("view");
+    let target_dir = base.join("target");
+    let nested_dir = target_dir.join("nested");
+    let nested_file = nested_dir.join("via_link.txt");
+    let link_path = view_dir.join("link_to_target");
+
+    let _ = fs::remove_dir_all(base);
+    fs::create_dir_all(&view_dir).unwrap();
+    fs::create_dir_all(&nested_dir).unwrap();
+    File::create(&nested_file).unwrap();
+
+    let target_abs = std::env::current_dir().unwrap().join(&target_dir);
+    let symlink_result = create_dir_symlink(&target_abs, &link_path);
+
+    #[cfg(windows)]
+    if let Err(e) = symlink_result {
+        eprintln!("skipping symlink traversal test: {e}");
+        let _ = fs::remove_dir_all(base);
+        return;
+    }
+
+    #[cfg(unix)]
+    symlink_result.unwrap();
+
+    let (default_output, _summary) = run_cmd(&view_dir, Config::default());
+    let (follow_output, _summary) = run_cmd(
+        &view_dir,
+        Config {
+            follow_symlinks: true,
+            ..Default::default()
+        },
+    );
+    let (only_dirs_output, _summary) = run_cmd(
+        &view_dir,
+        Config {
+            show_only_dirs: true,
+            follow_symlinks: true,
+            ..Default::default()
+        },
+    );
+
+    let _ = fs::remove_dir_all(base);
+
+    assert!(default_output.contains("link_to_target"));
+    assert!(!default_output.contains("nested"));
+    assert!(!default_output.contains("via_link.txt"));
+
+    assert!(follow_output.contains("link_to_target"));
+    assert!(follow_output.contains("nested"));
+    assert!(follow_output.contains("via_link.txt"));
+
+    assert!(only_dirs_output.contains("link_to_target"));
+    assert!(only_dirs_output.contains("nested"));
+    assert!(!only_dirs_output.contains("via_link.txt"));
 }
 
 #[test]
